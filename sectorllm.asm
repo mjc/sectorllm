@@ -698,7 +698,7 @@ forward:
     call rmsnorm                ; R_X = rmsnorm(R_X, w_rms_final)
 
     ; Compute logits and pick best token (use greedy argmax)
-    mov word [es:R_MAX+2], 0x8000 ; reset max to a very negative value
+    mov byte [es:R_MAX+3], 0x80 ; reset max to a very negative value
     xor di, di                       ; DI = token index
 
 ; logit computation: dot(R_X, embedding[i])
