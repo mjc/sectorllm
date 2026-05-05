@@ -702,7 +702,7 @@ forward:
 
     ; Compute logits and pick best token (use greedy argmax)
     mov byte [es:R_MAX+3], 0x80 ; reset max to a very negative value
-    xor di, di                       ; DI = token index
+    xor bx, bx                       ; BX = token index
 
 ; logit computation: dot(R_X, embedding[i])
 ; Since the model uses weight tying, the output projection reuses
@@ -710,30 +710,30 @@ forward:
 ; dot product of the final hidden state with embedding[i].
 .lm_loop:
     mov ax, W_TOKEN_EMB
-    imul cx, di, 16             ; token i * 16 paragraphs
+    imul cx, bx, 16             ; token i * 16 paragraphs
     add ax, cx
     mov ds, ax                  ; DS = embedding[i] segment
 
     xor ebp, ebp                ; ebp dot accumulator
-    xor si, si                  ; SI = R_X
-    xor bx, bx                  ; x = embedding row offset
+    xor si, si                  ; embedding row offset
+    xor di, di                  ; DI = R_X
     mov cx, DIM
 .dot:
-    es lodsd                    ; eax = R_X[j], SI += 4
-    imul dword [bx]             ; edx:eax = R_X[j] * embedding[i][j]
+    lodsd                       ; eax = embedding[i][j], SI += 4
+    imul dword [es:di]          ; edx:eax = embedding[i][j] * R_X[j]
     call q16_shift              ; inline this for more perf, but it'll cost you two bytes!
     add ebp, eax                ; accumulate
-    add bx, 4                   ; advance pointer
+    scasd                       ; DI += 4
     loop .dot
 
 ; argmax, just track the highest scoring token
     cmp ebp, [es:R_MAX]
     jle .skip_max
     mov [es:R_MAX], ebp         ; new best score
-    mov [es:R_BEST], di         ; new best token
+    mov [es:R_BEST], bx         ; new best token
 .skip_max:
-    inc di
-    cmp di, VOCAB
+    inc bx
+    cmp bx, VOCAB
     jl .lm_loop                 ; next token
 
     mov bx, [es:R_BEST]         ; return best in BX
