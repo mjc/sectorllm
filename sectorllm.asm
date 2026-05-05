@@ -571,8 +571,7 @@ quant_cache:
     ; quantize and cache
     pop dx
     call set_seg_1024           ; DS = int8 cache segment for this layer
-    mov bx, [es:CUR_POS]
-    shl bx, 5
+    shl bx, 3                   ; bx = CUR_POS * 32
     mov cx, KV_DIM
 .q_lp:
     mov eax, [es:di]
@@ -713,7 +712,6 @@ forward:
 ; dot product of the final hidden state with embedding[i].
 .lm_loop:
     mov ax, W_TOKEN_EMB
-    mov cx, di
     imul cx, di, 16             ; token i * 16 paragraphs
     add ax, cx
     mov ds, ax                  ; DS = embedding[i] segment
@@ -818,11 +816,11 @@ attention:
     ; 2. Softmax over attention scores
     ; Converts raw R_ATT[h][0..pos] to probabilities
 .softmax:
+    xor di, di
+    call get_att_ptr            ; SI = &R_ATT[h][0]
+    mov di, si
     mov cx, [es:CUR_POS]
     inc cx
-    mov di, bp
-    shl di, 11                  ; h * 2048 (SEQ * 4)
-    add di, R_ATT               ; DI = &R_ATT[h][0]
 
     ; Find max score
     push di
@@ -877,10 +875,9 @@ attention:
     ; out[h] = sum over t of (attention[h][t] * V[t])
 .agg:
     ; Clear r_xb[h] before accumulating
-    mov bx, bp
-    shl bx, 5                   ; h * 32
-    add bx, R_XB
-    mov di, bx
+    mov di, bp
+    shl di, 5                   ; h * 32
+    add di, R_XB
     xor eax, eax
     mov cx, HEAD_DIM
     rep stosd                   ; zero out R_XB[h]
