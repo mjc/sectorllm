@@ -625,7 +625,7 @@ forward:
 
 
     push di                     ; K start
-    mov cx, KV_HEADS
+    mov cl, KV_HEADS
     call apply_rope             ; rotate K
 
 
@@ -715,7 +715,7 @@ forward:
     xor ebp, ebp                ; ebp dot accumulator
     xor si, si                  ; embedding row offset
     xor di, di                  ; DI = R_X
-    mov cx, DIM
+    mov cl, DIM
 .dot:
     lodsd                       ; eax = embedding[i][j], SI += 4
     imul dword [es:di]          ; edx:eax = embedding[i][j] * R_X[j]
