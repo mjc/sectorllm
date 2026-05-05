@@ -554,10 +554,6 @@ quant_cache:
     push dword 127
     pop ebp
     idiv ebp                    ; eax = max / 127
-    test ax, ax
-    jnz .scale_ok
-    inc ax                      ; clamp to 1
-.scale_ok:
     xchg ebp, eax               ; ebp = scale
 
     ; store scale
