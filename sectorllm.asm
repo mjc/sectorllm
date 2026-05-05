@@ -682,11 +682,9 @@ forward:
     jl .layer
 
     ; Final normalization
-    push W_RMS_FINAL
-    pop ds
-    xor bx, bx
+    mov ax, W_RMS_FINAL - LAYERS * 16
     xor di, di                  ; R_X
-    call rmsnorm                ; R_X = rmsnorm(R_X, w_rms_final)
+    call do_rmsnorm             ; R_X = rmsnorm(R_X, w_rms_final)
 
     ; Compute logits and pick best token (use greedy argmax)
     xor bx, bx                       ; BX = token index
