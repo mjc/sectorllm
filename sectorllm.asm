@@ -540,10 +540,8 @@ quant_cache:
     cdq                         ; sign-extend into edx
     xor eax, edx
     sub eax, edx                ; eax = abs(eax)
-    cmp eax, ebx
-    jle .not_max
-    mov ebx, eax                ; new max
-.not_max:
+    cmp ebx, eax
+    cmovl ebx, eax              ; new max
     loop .max_lp
     pop di
 
