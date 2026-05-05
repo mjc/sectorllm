@@ -560,7 +560,7 @@ quant_cache:
     pop dx
     call set_seg_128            ; DS = scale cache segment for this layer
     imul bx, [es:CUR_POS], 4
-    mov [bx], ebp               ; scale_cache[bx] = scale
+    mov [bx], bp                ; scale_cache[bx] = scale
 
     ; quantize and cache
     pop dx
