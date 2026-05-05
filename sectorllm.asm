@@ -804,7 +804,7 @@ attention:
     ; Find max score
     push di
     push cx
-    mov eax, [es:di]            ; max = first elem
+    es lodsd                    ; max = first elem
 .max:
     scasd                       ; DI += 4, compare eax
     cmovl eax, [es:di-4]        ; new max
