@@ -758,8 +758,7 @@ attention:
     call get_kv_offset          ; BX = offset of K[t][kvh]
 
     ; Load Q vector for head h
-    mov si, bp
-    shl si, 5                   ; h * 32
+    imul si, bp, 32             ; h * 32
     add si, R_QKV               ; SI = &Q[h]
 
     push di                     ; save t
