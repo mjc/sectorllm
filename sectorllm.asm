@@ -543,7 +543,7 @@ quant_cache:
     cmp ebx, eax
     cmovl ebx, eax              ; new max
     loop .max_lp
-    pop di
+    pop si
 
 ; Compute scale (max / 127)
 .do_scale:
@@ -565,14 +565,14 @@ quant_cache:
     shl bx, 3                   ; bx = CUR_POS * 32
     mov cl, KV_DIM
 .q_lp:
-    mov eax, [es:di]
+    es lodsd
     cdq
     idiv ebp                    ; eax = round(x/scale), clamped to int8
     mov [bx], al                ; store quantized byte
     inc bx
-    scasd                       ; DI+=4
     loop .q_lp
 
+    mov di, si                  ; preserve DI advancement for the following K/V vector
     ret
 
 ; Full forward pass of the transformer for one token.
