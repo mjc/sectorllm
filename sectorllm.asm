@@ -346,7 +346,6 @@ vadd:
 ; in ES:DI: vector to rotate (FP16.16), modified in place
 ; in CX:     number of heads to process
 apply_rope:
-    push ebp
     imul bx, [es:CUR_POS], 32   ; bx = CUR_POS * 32 (8 bytes per pair * 4 pairs per head)
     push W_FREQ_CIS
     pop ds                      ; DS = freq table
@@ -399,7 +398,6 @@ apply_rope:
     pop cx
     pop bx
     loop .head_loop
-    pop ebp
     ret
 
 
@@ -507,19 +505,17 @@ get_att_ptr:
 ; ES:DI: input vector
 ; ES:BX: output vector
 do_matmul:
-    push bx                   ; save out_ptr
-    mov bx, [es:CUR_LAYER]
-    imul bx, cx               ; bx = layer * stride (paragraphs)
-    add bx, ax                ; bx = weight base + layer*stride
+    mov bp, [es:CUR_LAYER]
+    imul bp, cx               ; bp = layer * stride (paragraphs)
+    add ax, bp                ; ax = weight base + layer*stride
 
     ; Load single global scale from the scale segment for this layer
     mov ds, si
     mov ebp, [0]              ; load scale for current layer
 
-    mov ds, bx                ; DS = this layer's int8 weight segment
+    mov ds, ax                ; DS = this layer's int8 weight segment
 
     xor si, si                ; SI=0: matmul reads DS:SI starting from weight row 0
-    pop bx                    ; restore out_ptr
     jmp matmul
 
 ; Quantize K/V to int8 and save to cache
@@ -528,7 +524,6 @@ do_matmul:
 ; in AX: int8 cache segment base (KC_SEG or VC_SEG)
 ; in DX: scale segment base (KS_SEG or VS_SEG)
 quant_cache:
-    push ebp
     push ax                     ; save cache segment base
     push dx                     ; save scale segment base
 
@@ -582,7 +577,6 @@ quant_cache:
     scasd                       ; DI+=4
     loop .q_lp
 
-    pop ebp
     ret
 
 ; Full forward pass of the transformer for one token.
@@ -703,7 +697,6 @@ forward:
     ; Compute logits and pick best token (use greedy argmax)
     mov dword [es:R_MAX], 0x80000000 ; INT_MIN
     xor di, di                       ; DI = token index
-    mov word [es:R_BEST], di         ; best = 0
 
 ; logit computation: dot(R_X, embedding[i])
 ; Since the model uses weight tying, the output projection reuses
