@@ -849,8 +849,7 @@ attention:
     pop di
 .s_div:
     mov eax, [es:di]
-    mov edx, eax
-    shr edx, 16                 ; edx:eax = exp value as FP32.16
+    movzx edx, word [es:di+2]   ; edx:eax = exp value as FP32.16
     shl eax, 16
     div esi                     ; eax = exp / sum (FP16.16)
     stosd                       ; store probability, DI += 4
