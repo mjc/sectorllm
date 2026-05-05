@@ -827,12 +827,10 @@ attention:
 .s_ok:
     xchg ax, bx
     shl bx, 2                   ; bx = index * 4
-    mov edx, [fs:bx]            ; edx = exp_lut[diff]
+    mov eax, [fs:bx]            ; eax = exp_lut[diff]
+    add esi, eax                ; sum += exp
+    stosd                       ; replace score with exp, DI += 4
     pop eax                     ; restore max
-
-    mov [es:di], edx            ; replace score with exp
-    add esi, edx                ; sum += exp
-    scasd                       ; DI += 4
     loop .s_exp
 
     ; Divide each exp by sum
