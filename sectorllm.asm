@@ -590,9 +590,8 @@ quant_cache:
 ; out BX: predicted token
 forward:
     ; Load token embedding into R_X
-    mov ax, W_TOKEN_EMB
-    shl bx, 4                   ; token * DIM * 4
-    add ax, bx                  ; ax = segment of this token's embedding
+    imul ax, bx, 16             ; token * DIM * 4
+    add ax, W_TOKEN_EMB         ; ax = segment of this token's embedding
     mov ds, ax
     xor si, si
     xor di, di                  ; DI = R_X
