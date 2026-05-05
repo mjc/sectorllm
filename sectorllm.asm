@@ -499,6 +499,11 @@ get_att_ptr:
     add si, cx             ; SI = &R_ATT[h][t]
     ret
 
+get_pos_count:
+    mov cx, [es:CUR_POS]
+    inc cx
+    ret
+
 
 ; matmul helper: 
 ; in AX:   base_Q
@@ -746,8 +751,7 @@ attention:
     ; 1.QK dot products
     ; For each past token t, compute a_t = dot(Q_h, K_t) * scale
     ; and store in R_ATT[h][t]
-    mov cx, [es:CUR_POS]
-    inc cx                      ; process tokens t = 0..CUR_POS inclusive
+    call get_pos_count          ; process tokens t = 0..CUR_POS inclusive
     xor di, di                  ; DI = t
 .t_loop:
     push cx                     ; save token counter
@@ -812,8 +816,7 @@ attention:
     xor di, di
     call get_att_ptr            ; SI = &R_ATT[h][0]
     mov di, si
-    mov cx, [es:CUR_POS]
-    inc cx
+    call get_pos_count
 
     ; Find max score
     push di
@@ -873,8 +876,7 @@ attention:
     mov cx, HEAD_DIM
     rep stosd                   ; zero out R_XB[h]
 
-    mov cx, [es:CUR_POS]
-    inc cx
+    call get_pos_count
     xor di, di                  ; DI = t
 .v_loop:
     push cx
