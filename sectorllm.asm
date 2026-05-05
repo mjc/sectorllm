@@ -898,8 +898,7 @@ attention:
 
     ; Accumulate: R_XB[h] += a_scale * V[t]
     mov edx, eax                ; edx = a_scaled
-    mov si, bp
-    shl si, 5                   ; h * 32
+    imul si, bp, 32             ; h * 32
     add si, R_XB                ; SI = &R_XB[h]
 
     mov cx, HEAD_DIM
