@@ -871,7 +871,7 @@ attention:
     shl di, 5                   ; h * 32
     add di, R_XB
     xor eax, eax
-    mov cx, HEAD_DIM
+    mov cl, HEAD_DIM
     rep stosd                   ; zero out R_XB[h]
 
     call get_pos_count
