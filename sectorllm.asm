@@ -457,10 +457,6 @@ dap:
     dw 0x2000                   ; target segment
     dq 3                        ; start lba (sector 2)
 
-add_bx_cx_ret:
-    add bx, cx
-    ret
-
 get_pos_count:
     mov cx, [es:CUR_POS]
     inc cx
@@ -484,12 +480,12 @@ dw 0xAA55
 ; in BP:   h (attention head index)
 ; out BX:  t * KV_DIM + kvh * HEAD_DIM
 get_kv_offset:
-    mov bx, di
-    shl bx, 5  ; bx = t * 32 (KV_DIM bytes per token)
-    mov cx, bp ; cx = h
-    shr cx, 1  ; cx = kvh = h / 2 (2 attention heads share each KV head)
-    shl cx, 3  ; cx = kvh * 8 (HEAD_DIM bytes per KV head)
-    jmp short add_bx_cx_ret ; bx = offset of this token's KV head slice
+    imul cx, di, 32 ; cx = t * 32 (KV_DIM bytes per token)
+    mov bx, bp ; bx = h
+    shr bx, 1  ; bx = kvh = h / 2 (2 attention heads share each KV head)
+    shl bx, 3  ; bx = kvh * 8 (HEAD_DIM bytes per KV head)
+    add bx, cx ; bx = offset of this token's KV head slice
+    ret
 
 ; Compute a pointer into the attention score buffer.
 ; R_ATT layout is [head][token], each element being FP16.16
