@@ -608,7 +608,7 @@ forward:
     ; Project normalized input to Q, K, V simultaneously
     mov si, W_WQKV_S
     mov ax, W_WQKV_Q
-    mov cx, 0x200
+    mov ch, 2
     mov edx, (DIM << 16) | (DIM + 2*KV_DIM) ; rows=96 (Q+K+V), cols=64
     mov di, R_XB
     mov bx, R_QKV
@@ -617,7 +617,7 @@ forward:
 
     ; Apply RoPE to Q and K
     mov di, R_QKV
-    mov cx, HEADS
+    mov cl, HEADS
     call apply_rope             ; rotate Q
 
 
@@ -644,7 +644,7 @@ forward:
     ; Project attention output back to DIM
     mov si, W_WO_S
     mov ax, W_WO_Q
-    mov cx, 0x100
+    mov ch, 1
     mov edx, (DIM << 16) | DIM
     mov di, R_XB
     mov bx, R_XB2
