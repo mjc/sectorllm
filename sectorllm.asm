@@ -458,6 +458,10 @@ dap:
     dw 0x2000                   ; target segment
     dq 3                        ; start lba (sector 2)
 
+add_bx_cx_ret:
+    add bx, cx
+    ret
+
 _bootsector_end:
 %assign bootsector_size _bootsector_end - $$
 %warning boot sector is bootsector_size bytes.
@@ -481,8 +485,7 @@ get_kv_offset:
     mov cx, bp ; cx = h
     shr cx, 1  ; cx = kvh = h / 2 (2 attention heads share each KV head)
     shl cx, 3  ; cx = kvh * 8 (HEAD_DIM bytes per KV head)
-    add bx, cx ; bx = offset of this token's KV head slice
-    ret
+    jmp short add_bx_cx_ret ; bx = offset of this token's KV head slice
 
 ; Compute a pointer into the attention score buffer.
 ; R_ATT layout is [head][token], each element being FP16.16
@@ -695,7 +698,7 @@ forward:
     call rmsnorm                ; R_X = rmsnorm(R_X, w_rms_final)
 
     ; Compute logits and pick best token (use greedy argmax)
-    mov dword [es:R_MAX], 0x80000000 ; INT_MIN
+    mov word [es:R_MAX+2], 0x8000 ; reset max to a very negative value
     xor di, di                       ; DI = token index
 
 ; logit computation: dot(R_X, embedding[i])
@@ -737,10 +740,8 @@ forward:
 ; Reads Q from R_QKV, K/V from the quantized KV cache.
 ; Output is written into R_XB (one HEAD_DIM slice per head).
 attention:
-    mov cx, HEADS
     xor bp, bp                  ; bp = h (head index, 0..HEADS-1)
 .head_loop:
-    push cx
 
     ; 1.QK dot products
     ; For each past token t, compute a_t = dot(Q_h, K_t) * scale
@@ -802,8 +803,7 @@ attention:
 
     inc di                      ; t++
     pop cx
-    dec cx
-    jnz .t_loop
+    loop .t_loop
 
     ; 2. Softmax over attention scores
     ; Converts raw R_ATT[h][0..pos] to probabilities
@@ -840,11 +840,9 @@ attention:
     jle .s_ok
     mov ax, 511
 .s_ok:
-    push di
-    mov di, ax
-    shl di, 2                   ; di = index * 4
-    mov edx, [fs:di]            ; edx = exp_lut[diff]
-    pop di
+    mov bx, ax
+    shl bx, 2                   ; bx = index * 4
+    mov edx, [fs:bx]            ; edx = exp_lut[diff]
     pop eax                     ; restore max
 
     mov [es:di], edx            ; replace score with exp
@@ -891,10 +889,10 @@ attention:
 
     ; Dequantize V: multiply a_t by V scale for token t
     push ds
+    push cx
     mov dx, VS_SEG
     call set_seg_128            ; DS = V scale cache for this layer
-    mov si, di
-    shl si, 2                   ; t * 4
+    pop si                      ; t * 4 from get_att_ptr
     mov edx, [si]               ; edx = scale_vt
     pop ds                      ; restore DS = VC_SEG
 
@@ -922,9 +920,8 @@ attention:
 
     ; Next head
     inc bp
-    pop cx
-    dec cx
-    jnz .head_loop
+    cmp bp, HEADS
+    jl .head_loop
 .done:
     ret
 
