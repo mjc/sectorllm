@@ -782,11 +782,12 @@ attention:
     pop di                      ; restore t
 
     ; Dequantize: multiply by K scale for token t
+    call get_att_ptr            ; SI = &R_ATT[h][t], CX = t * 4
+    push si
+    push cx
     mov dx, KS_SEG
     call set_seg_128            ; DS = K scale cache for this layer
-
-    mov si, di
-    shl si, 2                   ; t * 4
+    pop si
     mov esi, [si]               ; esi = scale_kt
 
     imul esi
@@ -798,7 +799,7 @@ attention:
     call q16_shift              ; eax = a_t (attention score, FP16.16)
 
     ; store score in R_ATT[h][t]
-    call get_att_ptr            ; SI = &R_ATT[h][t]
+    pop si
     mov [es:si], eax
 
     inc di                      ; t++
