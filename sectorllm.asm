@@ -731,8 +731,8 @@ forward:
     mov [es:R_BEST], bx         ; new best token
 .skip_max:
     inc bx
-    cmp bx, VOCAB
-    jl .lm_loop                 ; next token
+    test bh, VOCAB >> 8
+    jz .lm_loop                 ; next token
 
     mov bx, [es:R_BEST]         ; return best in BX
     ret
