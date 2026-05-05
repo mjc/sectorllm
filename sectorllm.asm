@@ -535,9 +535,10 @@ quant_cache:
     ; Find max absolute value
     mov cx, KV_DIM
     push di                     ; save for pass 2
+    mov si, di
     xor ebx, ebx                ; ebx = running_max
 .max_lp:
-    mov eax, [es:di]
+    es lodsd
     cdq                         ; sign-extend into edx
     xor eax, edx
     sub eax, edx                ; eax = abs(eax)
@@ -545,7 +546,6 @@ quant_cache:
     jle .not_max
     mov ebx, eax                ; new max
 .not_max:
-    scasd                       ; DI += 4
     loop .max_lp
     pop di
 
@@ -625,19 +625,18 @@ forward:
     call apply_rope             ; rotate Q
 
 
-    mov di, R_QKV + DIM * 4     ; K starts after Q
+    push di                     ; K start
     mov cx, KV_HEADS
     call apply_rope             ; rotate K
 
 
 
     ; Quantize and cache K and V for this position
-    mov di, R_QKV + DIM*4
+    pop di
     mov ax, KC_SEG
     mov dx, KS_SEG
     call quant_cache            ; KC[layer][pos] = quantize(K)
 
-    mov di, R_QKV + DIM*4 + KV_DIM*4
     mov ax, VC_SEG
     mov dx, VS_SEG
     call quant_cache            ; VC[layer][pos] = quantize(V)
