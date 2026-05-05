@@ -740,7 +740,7 @@ forward:
 ; Reads Q from R_QKV, K/V from the quantized KV cache.
 ; Output is written into R_XB (one HEAD_DIM slice per head).
 attention:
-    xor bp, bp                  ; bp = h (head index, 0..HEADS-1)
+    mov bp, HEADS-1             ; bp = h (head index, HEADS-1..0)
 .head_loop:
 
     ; 1.QK dot products
@@ -920,9 +920,8 @@ attention:
     loop .v_loop
 
     ; Next head
-    inc bp
-    cmp bp, HEADS
-    jl .head_loop
+    dec bp
+    jns .head_loop
 .done:
     ret
 
