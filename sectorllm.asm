@@ -235,7 +235,7 @@ rmsnorm:
     ; ss = (sum / DIM) + epsilon
     mov eax, ebp
     shr eax, DIM_LOG            ; eax = sum/DIM
-    inc eax ; epsilon
+    inc ax ; epsilon
 
     call inv_sqrt               ; eax = 1/sqrt(ss) in FP16.16
     xchg ebp, eax               ; ebp = normalization scale
