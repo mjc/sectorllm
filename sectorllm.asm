@@ -842,7 +842,7 @@ attention:
     jle .s_ok
     mov ax, 511
 .s_ok:
-    mov bx, ax
+    xchg ax, bx
     shl bx, 2                   ; bx = index * 4
     mov edx, [fs:bx]            ; edx = exp_lut[diff]
     pop eax                     ; restore max
