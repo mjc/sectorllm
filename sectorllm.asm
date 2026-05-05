@@ -176,9 +176,6 @@ start_inference:
 ; out EAX: 1/sqrt(x) (FP16.16)
 ; Clobbers: ecx
 inv_sqrt:
-    push ebx
-    push esi
-
     xchg eax, ebx                ; save x
 
     ; Initial guess from bit position: y ~= 2^((48-bsr(x))/2)
@@ -204,8 +201,6 @@ inv_sqrt:
     shr eax, 1                  ; / 2
     loop .loop
 .done:
-    pop esi
-    pop ebx
     ret
 
 ; rmsnorm helper: sets up DS and BX before doing rmsnorm logic
@@ -247,6 +242,7 @@ rmsnorm:
     xchg ebp, eax               ; ebp = normalization scale
 
     pop si                      ; restore SI to R_X
+    xor bx, bx                  ; restore weight pointer clobbered by inv_sqrt
     mov cl, DIM
 
 ; 2. Normalize and apply weights
@@ -464,6 +460,10 @@ get_pos_count:
     inc cx
     ret
 
+zero_si_jmp_matmul:
+    xor si, si
+    jmp matmul
+
 _bootsector_end:
 %assign bootsector_size _bootsector_end - $$
 %warning boot sector is bootsector_size bytes.
@@ -518,8 +518,7 @@ do_matmul:
 
     mov ds, ax                ; DS = this layer's int8 weight segment
 
-    xor si, si                ; SI=0: matmul reads DS:SI starting from weight row 0
-    jmp matmul
+    jmp short zero_si_jmp_matmul ; matmul reads DS:SI from weight row 0
 
 ; Quantize K/V to int8 and save to cache
 ; Uses absmax quantization: scale = max(|x|) / 127, then q = round(x / scale)
