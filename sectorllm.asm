@@ -922,11 +922,10 @@ silu_gate:
 
     shl ax, 2
     xchg ax, bx                 ; bx = index * 4
-    mov edx, [fs:bx+0x800]      ; edx = silu_lut[ax]
 
     ; Multiply by up[i] and store in gate[i]
     es lodsd                    ; eax = up[i]
-    imul edx                    ; eax = up[i] * silu(gate[i])
+    imul dword [fs:bx+0x800]    ; eax = up[i] * silu(gate[i])
     call q16_shift              ; shift back to FP16.16
     stosd                       ; gate[i] = res, DI += 4
     loop .lp
