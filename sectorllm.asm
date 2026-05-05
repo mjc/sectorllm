@@ -929,10 +929,6 @@ silu_gate:
     cwd                         ; dx = 0xFFFF if ax < 0 else 0
     not dx                      ; dx = 0 if ax < 0, else 0xFFFF
     and ax, dx                  ; ax = max(0, ax)
-    cmp ax, 1023
-    jle .ok
-    mov ax, 1023                ; ax = min(ax, 1023)
-.ok:
     shl ax, 2
     xchg ax, bx                 ; bx = index * 4
     mov edx, [fs:bx+0x800]      ; edx = silu_lut[ax]
