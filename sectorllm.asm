@@ -788,7 +788,7 @@ attention:
     call q16_shift              ; eax = dot * scale_kt
 
     ; multiply by 1/sqrt(HEAD_DIM) ~= 23170
-    mov esi, 23170
+    mov si, 23170
     imul esi
     call q16_shift              ; eax = a_t (attention score, FP16.16)
 
