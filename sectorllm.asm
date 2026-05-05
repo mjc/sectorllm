@@ -523,7 +523,7 @@ do_matmul:
 
 ; Quantize K/V to int8 and save to cache
 ; Uses absmax quantization: scale = max(|x|) / 127, then q = round(x / scale)
-; in DI: input vector (FP16.16[KV_DIM])
+; in SI: input vector (FP16.16[KV_DIM])
 ; in AX: int8 cache segment base (KC_SEG or VC_SEG)
 ; in DX: scale segment base (KS_SEG or VS_SEG)
 quant_cache:
@@ -532,8 +532,7 @@ quant_cache:
 
     ; Find max absolute value
     mov cl, KV_DIM
-    push di                     ; save for pass 2
-    mov si, di
+    push si                     ; save for pass 2
     xor ebx, ebx                ; ebx = running_max
 .max_lp:
     es lodsd
@@ -572,7 +571,6 @@ quant_cache:
     inc bx
     loop .q_lp
 
-    mov di, si                  ; preserve DI advancement for the following K/V vector
     ret
 
 ; Full forward pass of the transformer for one token.
@@ -620,7 +618,7 @@ forward:
 
 
     ; Quantize and cache K and V for this position
-    pop di
+    pop si
     mov ax, KC_SEG
     mov dx, KS_SEG
     call quant_cache            ; KC[layer][pos] = quantize(K)
