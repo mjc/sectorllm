@@ -132,7 +132,6 @@ entry:
     mov bx, 0x7E00
     mov ax, 0x0202              ; AH=02 read, AL=2 sectors
     mov cx, 0x0002              ; CH=0 cylinder, CL=2 sector
-    xor dh, dh
     int 0x13
     ; assume no error ;)
 
@@ -318,7 +317,7 @@ q16_shift:
 ; Convenience wrapper around vadd for post-matmul accumulation (saves bytes)
 vadd_rx:
     dec bh                      ; matmul leaves BX one DIM vector past output
-    mov si, bx                  ; grab pointer from matmul
+    xchg si, bx                 ; grab pointer from matmul
     xor di, di                  ; R_X
 
 ; Vector addition: ES:DI += ES:SI for DIM FP16.16 elements
@@ -414,7 +413,6 @@ print_token:
 .print:
     lodsd                       ; skip int32 score, SI += 4
     mov ah, 0x0E                ; teletype out
-    xor bh, bh                  ; page 0
 .print_str:
     lodsb                       ; c=VOCAB_PTR[SI++]
     test al, al
@@ -463,6 +461,10 @@ get_pos_count:
 zero_si_jmp_matmul:
     xor si, si
     jmp matmul
+
+rxb_do_rmsnorm:
+    mov di, R_XB
+    jmp do_rmsnorm
 
 _bootsector_end:
 %assign bootsector_size _bootsector_end - $$
@@ -592,8 +594,7 @@ forward:
 .layer:
     ; Normalize input before attention
     mov ax, W_RMS_ATT
-    mov di, R_XB
-    call do_rmsnorm             ; R_XB = rmsnorm(R_X, w_rms_att[layer])
+    call rxb_do_rmsnorm         ; R_XB = rmsnorm(R_X, w_rms_att[layer])
 
 
 
@@ -649,8 +650,7 @@ forward:
 
     ; Normalize before FFN
     mov ax, W_RMS_FFN
-    mov di, R_XB
-    call do_rmsnorm             ; R_XB = rmsnorm(R_X, w_rms_ffn[layer])
+    call rxb_do_rmsnorm         ; R_XB = rmsnorm(R_X, w_rms_ffn[layer])
 
     ; Project up to hidden dim
     mov si, W_W13_S
