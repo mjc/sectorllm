@@ -484,8 +484,7 @@ dw 0xAA55
 ; in BP:   h (attention head index)
 ; out BX:  t * KV_DIM + kvh * HEAD_DIM
 get_kv_offset:
-    mov bx, di
-    shl bx, 5  ; bx = t * 32 (KV_DIM bytes per token)
+    imul bx, di, 32 ; bx = t * 32 (KV_DIM bytes per token)
     mov cx, bp ; cx = h
     shr cx, 1  ; cx = kvh = h / 2 (2 attention heads share each KV head)
     shl cx, 3  ; cx = kvh * 8 (HEAD_DIM bytes per KV head)
