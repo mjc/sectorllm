@@ -593,7 +593,7 @@ forward:
     mov ds, ax
     xor si, si
     xor di, di                  ; DI = R_X
-    mov cx, DIM * 2             ; dword
+    mov cl, DIM * 2             ; dword
     rep movsw                   ; R_X = embedding[token]
 
     mov [es:CUR_LAYER], cx      ; cx is 0
