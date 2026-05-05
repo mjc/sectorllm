@@ -879,10 +879,9 @@ attention:
     mov dx, VS_SEG
     call set_seg_128            ; DS = V scale cache for this layer
     pop si                      ; t * 4 from get_att_ptr
-    mov edx, [si]               ; edx = scale_vt
+    imul dword [si]             ; multiply by scale_vt
     pop ds                      ; restore DS = VC_SEG
 
-    imul edx
     call q16_shift              ; eax = a_scaled = a_t * scale_vt
 
     ; Accumulate: R_XB[h] += a_scale * V[t]
