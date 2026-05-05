@@ -920,7 +920,7 @@ attention:
 silu_gate:
     mov di, R_HB                ; DI = gate vector
     mov si, R_HB+HIDDEN*4       ; SI = up vector
-    mov cx, HIDDEN
+    mov cl, HIDDEN
 .lp:
     ; Compute silu_lut index from gate[i]
     mov eax, [es:di]            ; eax = gate[i] (FP16.16)
