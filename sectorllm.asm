@@ -226,7 +226,7 @@ rmsnorm:
     push ebp
 
     xor ebp, ebp                ; ebp = sum of squares accumulator
-    mov cx, DIM
+    mov cl, DIM
     xor si, si                  ; SI=0, points to ES:R_X
     push si                     
 
@@ -248,7 +248,7 @@ rmsnorm:
     xchg ebp, eax               ; ebp = normalization scale
 
     pop si                      ; restore SI to R_X
-    mov cx, DIM
+    mov cl, DIM
 
 ; 2. Normalize and apply weights
 .norm:
@@ -354,7 +354,7 @@ apply_rope:
 .head_loop:
     push bx                     ; save freq table offset
     push cx                     ; save head counter
-    mov cx, 4                   ; 4 pairs per head
+    mov cl, 4                   ; 4 pairs per head
 
 .pair_loop:
     ; Load sin and cos values
@@ -531,7 +531,7 @@ quant_cache:
     push dx                     ; save scale segment base
 
     ; Find max absolute value
-    mov cx, KV_DIM
+    mov cl, KV_DIM
     push di                     ; save for pass 2
     mov si, di
     xor ebx, ebx                ; ebx = running_max
@@ -570,7 +570,7 @@ quant_cache:
     pop dx
     call set_seg_1024           ; DS = int8 cache segment for this layer
     shl bx, 3                   ; bx = CUR_POS * 32
-    mov cx, KV_DIM
+    mov cl, KV_DIM
 .q_lp:
     mov eax, [es:di]
     cdq
@@ -764,7 +764,7 @@ attention:
 
     push di                     ; save t
     push bp                     ; save h
-    mov cx, HEAD_DIM
+    mov cl, HEAD_DIM
     xor ebp, ebp                ; acc
 
 ; dot(Q_h, K_t), K is int8, Q is FP16.16
