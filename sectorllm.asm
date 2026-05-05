@@ -295,7 +295,7 @@ matmul:
     loop .dot
 
 ; dequantize: (acc * scale) >> 16
-    mov eax, ebx
+    xchg eax, ebx
     imul ebp                    ; edx:eax = acc * scale
     call q16_shift              ; eax = result in FP16.16
 
@@ -549,7 +549,7 @@ quant_cache:
 
 ; Compute scale (max / 127)
 .do_scale:
-    mov eax, ebx
+    xchg eax, ebx
     cdq
     push dword 127
     pop ebp
