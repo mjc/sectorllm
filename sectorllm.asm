@@ -270,8 +270,6 @@ rmsnorm:
 ; in EDX:       (ROWS << 16) | COLS
 ; in EBP:       FP16.16 scale factor for dequantization
 matmul:
-    pushad
-
     mov ax, dx                  ; ax = ROWS
     shr edx, 16                 ; dx = COLS
 
@@ -312,7 +310,6 @@ matmul:
     dec ax
     jnz .row
 
-    popad
     ret
 
 ; It is slower to always call this function but it saves two bytes each time!
@@ -324,6 +321,7 @@ q16_shift:
 ; in ES:BX: matmul output
 ; Convenience wrapper around vadd for post-matmul accumulation (saves bytes)
 vadd_rx:
+    dec bh                      ; matmul leaves BX one DIM vector past output
     mov si, bx                  ; grab pointer from matmul
     xor di, di                  ; R_X
 
@@ -331,7 +329,7 @@ vadd_rx:
 ; in ES:SI: src vector (FP16.16[DIM])
 ; in ES:DI: dest vector (FP16.16[DIM])
 vadd:
-    mov cx, DIM
+    mov cl, DIM
 .lp:
     es lodsd                    ; eax = *SI, SI += 4
     add [es:di], eax            ; *DI += eax
