@@ -693,7 +693,6 @@ forward:
     call rmsnorm                ; R_X = rmsnorm(R_X, w_rms_final)
 
     ; Compute logits and pick best token (use greedy argmax)
-    mov byte [es:R_MAX+3], 0x80 ; reset max to a very negative value
     xor bx, bx                       ; BX = token index
 
 ; logit computation: dot(R_X, embedding[i])
@@ -718,8 +717,11 @@ forward:
     loop .dot
 
 ; argmax, just track the highest scoring token
+    test bx, bx
+    jz .set_max                 ; token 0 seeds the max for this pass
     cmp ebp, [es:R_MAX]
     jle .skip_max
+.set_max:
     mov [es:R_MAX], ebp         ; new best score
     mov [es:R_BEST], bx         ; new best token
 .skip_max:
