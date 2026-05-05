@@ -925,10 +925,6 @@ silu_gate:
     sar eax, 10                 ; downscale to [-512, 511] 
     add ah, 2                   ; ax += 512, shift to [0, 1023]
 
-    ; clamp to [0, 1023]
-    cwd                         ; dx = 0xFFFF if ax < 0 else 0
-    not dx                      ; dx = 0 if ax < 0, else 0xFFFF
-    and ax, dx                  ; ax = max(0, ax)
     shl ax, 2
     xchg ax, bx                 ; bx = index * 4
     mov edx, [fs:bx+0x800]      ; edx = silu_lut[ax]
