@@ -892,7 +892,7 @@ attention:
     call q16_shift              ; eax = a_scaled = a_t * scale_vt
 
     ; Accumulate: R_XB[h] += a_scale * V[t]
-    mov edx, eax                ; edx = a_scaled
+    xchg edx, eax               ; edx = a_scaled
     imul si, bp, 32             ; h * 32
     add si, R_XB                ; SI = &R_XB[h]
 
