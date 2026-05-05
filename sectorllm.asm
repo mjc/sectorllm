@@ -466,6 +466,10 @@ get_pos_count:
     inc cx
     ret
 
+add_si_cx_ret:
+    add si, cx
+    ret
+
 _bootsector_end:
 %assign bootsector_size _bootsector_end - $$
 %warning boot sector is bootsector_size bytes.
@@ -500,8 +504,7 @@ get_att_ptr:
     imul si, bp, 2048	   ; h * 2048 (SEG * 4 bytes)
     add si, R_ATT          ; SI = base of this head's attention scores
     imul cx, di, 4         ; cx = t * 4 (4 bytes per score)
-    add si, cx             ; SI = &R_ATT[h][t]
-    ret
+    jmp short add_si_cx_ret ; SI = &R_ATT[h][t]
 
 ; matmul helper: 
 ; in AX:   base_Q
