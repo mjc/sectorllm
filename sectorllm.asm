@@ -811,9 +811,7 @@ attention:
     mov eax, [es:di]            ; max = first elem
 .max:
     scasd                       ; DI += 4, compare eax
-    jge .notmax                 ; eax >= [es:di], not new max
-    mov eax, [es:di-4]          ; new max
-.notmax:
+    cmovl eax, [es:di-4]        ; new max
     loop .max
     pop cx
     pop di
