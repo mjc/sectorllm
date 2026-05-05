@@ -509,9 +509,8 @@ get_att_ptr:
 ; ES:DI: input vector
 ; ES:BX: output vector
 do_matmul:
-    mov bp, [es:CUR_LAYER]
-    imul bp, cx               ; bp = layer * stride (paragraphs)
-    add ax, bp                ; ax = weight base + layer*stride
+    imul cx, [es:CUR_LAYER]   ; cx = layer * stride (paragraphs)
+    add ax, cx                ; ax = weight base + layer*stride
 
     ; Load single global scale from the scale segment for this layer
     mov ds, si
