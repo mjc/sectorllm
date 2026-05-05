@@ -141,7 +141,7 @@ entry:
     pop es
 
     ; Load the model at 0x2000:0
-    mov cx, 12
+    mov cl, 12
     mov si, dap
 
 .load_model:
@@ -212,8 +212,7 @@ inv_sqrt:
 ; in AX:      weight segment base
 ; in ES:DI:   output buffer
 do_rmsnorm:
-        mov cx, [es:CUR_LAYER]
-        shl cx, 4
+        imul cx, word [es:CUR_LAYER], 16
         add ax, cx
         mov ds, ax
         xor bx, bx
@@ -462,6 +461,11 @@ add_bx_cx_ret:
     add bx, cx
     ret
 
+get_pos_count:
+    mov cx, [es:CUR_POS]
+    inc cx
+    ret
+
 _bootsector_end:
 %assign bootsector_size _bootsector_end - $$
 %warning boot sector is bootsector_size bytes.
@@ -498,12 +502,6 @@ get_att_ptr:
     imul cx, di, 4         ; cx = t * 4 (4 bytes per score)
     add si, cx             ; SI = &R_ATT[h][t]
     ret
-
-get_pos_count:
-    mov cx, [es:CUR_POS]
-    inc cx
-    ret
-
 
 ; matmul helper: 
 ; in AX:   base_Q
