@@ -865,8 +865,7 @@ attention:
     ; out[h] = sum over t of (attention[h][t] * V[t])
 .agg:
     ; Clear r_xb[h] before accumulating
-    mov di, bp
-    shl di, 5                   ; h * 32
+    imul di, bp, 32             ; h * 32
     add di, R_XB
     xor eax, eax
     mov cl, HEAD_DIM
