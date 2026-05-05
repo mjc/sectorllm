@@ -551,9 +551,8 @@ quant_cache:
 .do_scale:
     xchg eax, ebx
     cdq
-    push dword 127
-    pop ebp
-    idiv ebp                    ; eax = max / 127
+    mov cl, 127
+    idiv ecx                    ; eax = max / 127
     xchg ebp, eax               ; ebp = scale
 
     ; store scale
