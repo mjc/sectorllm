@@ -160,9 +160,7 @@ start_inference:
     call forward
     cmp bx, 2                   ; check for BOS or EOS
     jbe .halt
-    push bx
     call print_token
-    pop bx
     inc word [es:CUR_POS]
     jmp .gen_loop
 .halt:
@@ -460,6 +458,10 @@ get_pos_count:
 add_si_cx_ret:
     add si, cx
     ret
+
+set_vs_seg:
+    mov dx, VS_SEG
+    jmp short set_seg_128
 
 zero_si_jmp_matmul:
     xor si, si
@@ -866,8 +868,7 @@ attention:
     ; Dequantize V: multiply a_t by V scale for token t
     push ds
     push cx
-    mov dx, VS_SEG
-    call set_seg_128            ; DS = V scale cache for this layer
+    call set_vs_seg             ; DS = V scale cache for this layer
     pop si                      ; t * 4 from get_att_ptr
     imul dword [si]             ; multiply by scale_vt
     pop ds                      ; restore DS = VC_SEG
