@@ -244,7 +244,27 @@ rmsnorm:
     stosd                 ; write to output, DI += 4
     loop .norm
 .done:
+    xchg di, bx
     ret
+
+; matmul helper:
+; in AX:   base_Q
+; in CX:   layer stride
+; in EDX:  (rows<<16) | cols
+; ES:DI: input vector
+; ES:BX: output vector
+do_matmul:
+    imul si, cx, LAYERS        ; SI = scale segment delta = stride * layers
+    add si, ax                 ; SI = scale segment base
+    imul cx, [es:CUR_LAYER]    ; cx = layer * stride (paragraphs)
+    add ax, cx                 ; ax = weight base + layer*stride
+
+    ; Load single global scale from the scale segment for this layer
+    mov ds, si
+    xor si, si
+    mov ebp, [si]              ; load scale for current layer
+
+    mov ds, ax                 ; DS = this layer's int8 weight segment
 
 ; Multiply an int8 matrix by a FP16.16 vector
 ; in DS:SI:     int8 weight matrix (row-major)
@@ -456,26 +476,6 @@ vadd_rx:
     xor di, di                  ; R_X
     jmp vadd
 
-; matmul helper: 
-; in AX:   base_Q
-; in CX:   layer stride
-; in EDX:  (rows<<16) | cols
-; ES:DI: input vector
-; ES:BX: output vector
-do_matmul:
-    imul si, cx, LAYERS        ; SI = scale segment delta = stride * layers
-    add si, ax                 ; SI = scale segment base
-    imul cx, [es:CUR_LAYER]   ; cx = layer * stride (paragraphs)
-    add ax, cx                ; ax = weight base + layer*stride
-
-    ; Load single global scale from the scale segment for this layer
-    mov ds, si
-    xor si, si
-    mov ebp, [si]             ; load scale for current layer
-
-    mov ds, ax                ; DS = this layer's int8 weight segment
-    jmp matmul                ; matmul reads DS:SI from weight row 0
-
 zero_si_zero_di_jmp_get_pos_count:
     xor si, si
 
@@ -512,14 +512,6 @@ dw 0xAA55
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Sector 1 and 2                                                             ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-; Quantize K/V to int8 and save to cache
-; Uses absmax quantization: scale = max(|x|) / 127, then q = round(x / scale)
-; in SI: input vector (FP16.16[KV_DIM])
-; in AX: int8 cache segment base (KC_SEG or VC_SEG)
-; in DX: scale segment base (KS_SEG or VS_SEG)
-set_seg_get_kv_ptr:
-    jmp call_set_seg_1024_jmp_get_kv_offset
 
 quant_cache:
     ; Find max absolute value
@@ -586,7 +578,6 @@ forward:
     mov ax, W_WQKV_Q
     mov ch, 2
     mov edx, (DIM << 16) | (DIM + 2*KV_DIM) ; rows=96 (Q+K+V), cols=64
-    xchg di, bx
     call do_matmul              ; R_QKV = [Q | K | V] = w_wqkv * R_XB
 
 
@@ -631,7 +622,6 @@ forward:
     mov ax, W_W13_Q
     mov cx, 0x560
     mov edx, (DIM << 16) | (2*HIDDEN)
-    xchg di, bx
     call do_matmul              ; R_HB = [gate | up] = w_w13 * R_XB
 
     ; Apply SiLU gating
@@ -708,13 +698,12 @@ attention:
 
     ; load K vector for token T, KV head kvh = h/2
     mov dx, KC_SEG
-    call set_seg_get_kv_ptr     ; DS = K cache, BX = offset of K[t][kvh]
+    call call_set_seg_1024_jmp_get_kv_offset ; DS = K cache, BX = offset of K[t][kvh]
 
     ; Load Q vector for head h
     imul si, bp, 32             ; h * 32
     add si, R_QKV               ; SI = &Q[h]
 
-    push di                     ; save t
     push bp                     ; save h
     mov cl, HEAD_DIM
     xor ebp, ebp                ; acc
@@ -731,7 +720,6 @@ attention:
 .dot_done:
     xchg eax, ebp
     pop bp                      ; restore h
-    pop di                      ; restore t
 
     ; Dequantize: multiply by K scale for token t
     call get_att_ptr            ; SI = &R_ATT[h][t], CX = t * 4
@@ -824,7 +812,7 @@ attention:
 
     ; Load V vector for token t, KV head kvh = h/2
     mov dx, VC_SEG
-    call set_seg_get_kv_ptr     ; DS = V cache, BX = offset of V[t][kvh]
+    call call_set_seg_1024_jmp_get_kv_offset ; DS = V cache, BX = offset of V[t][kvh]
 
     ; a_t = R_ATT[h][t]
     call get_att_ptr            ; SI = &R_ATT[h][t]
