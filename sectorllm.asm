@@ -221,7 +221,7 @@ rmsnorm:
 .sum:
     es lodsd                    ; eax = x[i], SI+=4
     imul eax                    ; edx:eax = x[i]^2
-    Q16_SHIFT_INLINE            ; eax = x[i]^2 in FP16.16
+    call q16_shift              ; eax = x[i]^2 in FP16.16
     add ebp, eax                ; ebp += x[i]^2
     loop .sum
 
@@ -242,9 +242,9 @@ rmsnorm:
 .norm:
     es lodsd              ; eax = x[i], SI += 4
     imul ebp              ; eax = x[i] * (1/sqrt(ss))
-    Q16_SHIFT_INLINE
+    call q16_shift
     imul dword [bx]       ; eax *= w[i]
-    Q16_SHIFT_INLINE      ; eax = x[i] * w[i] / sqrt(ss)
+    call q16_shift        ; eax = x[i] * w[i] / sqrt(ss)
     add bx, 4             ; advance weight pointer
     stosd                 ; write to output, DI += 4
     loop .norm
@@ -351,24 +351,24 @@ apply_rope:
     ;   new_x1 = x0*sin + x1*cos
     mov eax, [es:di+4]          ; x1
     imul esi                    ; x1*sin
-    Q16_SHIFT_INLINE   
+    call q16_shift
     push eax                    ; stack = x1*sin
 
     mov eax, [es:di]            ; x0
     imul ebp                    ; x0 * cos
-    Q16_SHIFT_INLINE
+    call q16_shift
     pop edx                     ; edx = x1*sin
     sub eax, edx                ; new_x0 = (x0*cos)-(x1*sin)
     push eax                    ; stack = new_x0
 
     mov eax, [es:di+4]          ; x1
     imul ebp                    ; x1*cos
-    Q16_SHIFT_INLINE
+    call q16_shift
     push eax                    ; stack = x1*cos, new_x0
 
     mov eax, [es:di]            ; x0
     imul esi                    ; x0*sin
-    Q16_SHIFT_INLINE
+    call q16_shift
     pop edx                     ; edx = x1*cos
     add eax, edx                ; eax = x0*sin+x1*cos
 
@@ -466,6 +466,11 @@ set_ks_seg:
 set_kc_seg:
     mov dx, KC_SEG
     jmp short set_seg_1024
+
+quant_k_cache:
+    mov ax, KC_SEG
+    mov dx, KS_SEG
+    jmp quant_cache
 
 zero_si_jmp_matmul:
     xor si, si
@@ -623,9 +628,7 @@ forward:
 
     ; Quantize and cache K and V for this position
     pop si
-    mov ax, KC_SEG
-    mov dx, KS_SEG
-    call quant_cache            ; KC[layer][pos] = quantize(K)
+    call quant_k_cache          ; KC[layer][pos] = quantize(K)
 
     mov ax, VC_SEG
     mov dx, VS_SEG
