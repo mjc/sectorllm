@@ -463,10 +463,11 @@ vadd_rx:
 ; in AX:   base_Q
 ; in CX:   layer stride
 ; in EDX:  (rows<<16) | cols
-; in SI: scale segment
 ; ES:DI: input vector
 ; ES:BX: output vector
 do_matmul:
+    imul si, cx, LAYERS        ; SI = scale segment delta = stride * layers
+    add si, ax                 ; SI = scale segment base
     imul cx, [es:CUR_LAYER]   ; cx = layer * stride (paragraphs)
     add ax, cx                ; ax = weight base + layer*stride
 
@@ -488,12 +489,6 @@ get_pos_count:
 
 quant_cache_q_lp_tail:
     loop quant_cache.q_lp
-    ret
-
-mov_ds_ax_ret:
-    mov ds, ax
-    xor si, si
-    xor di, di
     ret
 
 _bootsector_end:
@@ -556,6 +551,12 @@ quant_cache:
     inc bx
     jmp quant_cache_q_lp_tail
 
+mov_ds_ax_ret:
+    mov ds, ax
+    xor si, si
+    xor di, di
+    ret
+
 set_ds_token_emb:
     imul ax, bx, 16
     add ax, W_TOKEN_EMB
@@ -580,7 +581,6 @@ forward:
 
 
     ; Project normalized input to Q, K, V simultaneously
-    mov si, W_WQKV_S
     mov ax, W_WQKV_Q
     mov ch, 2
     mov edx, (DIM << 16) | (DIM + 2*KV_DIM) ; rows=96 (Q+K+V), cols=64
@@ -610,7 +610,6 @@ forward:
     call attention              ; R_XB = attention(Q, KC, VC)
 
     ; Project attention output back to DIM
-    mov si, W_WO_S
     mov ax, W_WO_Q
     mov ch, 1
     mov edx, (DIM << 16) | DIM
@@ -628,7 +627,6 @@ forward:
     call do_rmsnorm             ; R_XB = rmsnorm(R_X, w_rms_ffn[layer])
 
     ; Project up to hidden dim
-    mov si, W_W13_S
     mov ax, W_W13_Q
     mov cx, 0x560
     mov edx, (DIM << 16) | (2*HIDDEN)
@@ -640,7 +638,6 @@ forward:
     call silu_gate
 
     ; Project back down to DIM
-    mov si, W_W2_S
     mov ax, W_W2_Q
     mov cx, 0x2B0
     mov edx, (HIDDEN << 16) | DIM
