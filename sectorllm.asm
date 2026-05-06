@@ -645,7 +645,6 @@ forward:
     mov ax, W_RMS_FINAL - LAYERS * 16
     xor di, di                  ; R_X
     call do_rmsnorm             ; R_X = rmsnorm(R_X, w_rms_final)
-    xchg di, bx
 
     ; Compute logits and pick best token (use greedy argmax)
     xor bx, bx                       ; BX = token index
