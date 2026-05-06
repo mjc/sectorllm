@@ -757,10 +757,10 @@ attention:
 
 ; dot(Q_h, K_t), K is int8, Q is FP16.16
 .dot_loop:
-    movsx eax, byte [bx]        ; eax = K
+    movsx edx, byte [bx]        ; edx = K
     inc bx
-    imul dword [es:si]          ; edx:eax = K[t][i] * Q[h][i]
-    add si, 4
+    es lodsd                    ; eax = Q[h][i], SI += 4
+    imul edx                    ; edx:eax = Q[h][i] * K[t][i]
     add ebp, eax                ; accumulate (low 32 bits enough for HEAD_DIM=8)
     loop .dot_loop
 
