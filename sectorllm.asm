@@ -705,7 +705,6 @@ attention:
     imul si, bp, 32             ; h * 32
     add si, R_QKV               ; SI = &Q[h]
 
-    push di                     ; save t
     push bp                     ; save h
     mov cl, HEAD_DIM
     xor ebp, ebp                ; acc
@@ -722,7 +721,6 @@ attention:
 .dot_done:
     xchg eax, ebp
     pop bp                      ; restore h
-    pop di                      ; restore t
 
     ; Dequantize: multiply by K scale for token t
     call get_att_ptr            ; SI = &R_ATT[h][t], CX = t * 4
