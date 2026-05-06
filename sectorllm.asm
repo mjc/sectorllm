@@ -264,7 +264,7 @@ rmsnorm:
 ; in EDX:       (ROWS << 16) | COLS
 ; in EBP:       FP16.16 scale factor for dequantization
 matmul:
-    mov ax, dx                  ; ax = ROWS
+    xchg ax, dx                 ; ax = ROWS
     shr edx, 16                 ; dx = COLS
 
 ; For each output element
@@ -457,6 +457,10 @@ get_pos_count:
     inc cx
     ret
 
+add_si_cx_ret:
+    add si, cx
+    ret
+
 zero_si_jmp_matmul:
     xor si, si
     jmp matmul
@@ -494,8 +498,7 @@ get_att_ptr:
     imul si, bp, 2048	   ; h * 2048 (SEG * 4 bytes)
     add si, R_ATT          ; SI = base of this head's attention scores
     imul cx, di, 4         ; cx = t * 4 (4 bytes per score)
-    add si, cx             ; SI = &R_ATT[h][t]
-    ret
+    jmp short add_si_cx_ret ; SI = &R_ATT[h][t]
 
 ; matmul helper: 
 ; in AX:   base_Q
