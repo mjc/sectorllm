@@ -475,21 +475,16 @@ do_matmul:
     xor si, si
     jmp matmul                ; matmul reads DS:SI from weight row 0
 
-zero_si_zero_di_jmp_get_pos_count:
+zero_si_zero_di_ret:
     xor si, si
+    xor di, di
+    ret
 
 zero_di_jmp_get_pos_count:
     xor di, di
 get_pos_count:
     mov cx, [es:CUR_POS]
     inc cx
-    ret
-
-inc_bx_q_lp_tail:
-    inc bx
-
-quant_cache_q_lp_tail:
-    loop quant_cache.q_lp
     ret
 
 call_set_seg_1024_jmp_get_kv_offset:
@@ -547,13 +542,15 @@ quant_cache:
     cdq
     idiv ebp                    ; eax = round(x/scale), clamped to int8
     mov [bx], al                ; store quantized byte
-    jmp inc_bx_q_lp_tail
+    inc bx
+    loop .q_lp
+    ret
 
 set_ds_token_emb:
     imul ax, bx, 16
     add ax, W_TOKEN_EMB
     mov ds, ax
-    jmp zero_si_zero_di_jmp_get_pos_count
+    jmp zero_si_zero_di_ret
 
 ; Full forward pass of the transformer for one token.
 ; in BX:  input token index
