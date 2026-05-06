@@ -551,16 +551,13 @@ quant_cache:
     inc bx
     jmp quant_cache_q_lp_tail
 
-mov_ds_ax_ret:
+set_ds_token_emb:
+    imul ax, bx, 16
+    add ax, W_TOKEN_EMB
     mov ds, ax
     xor si, si
     xor di, di
     ret
-
-set_ds_token_emb:
-    imul ax, bx, 16
-    add ax, W_TOKEN_EMB
-    jmp mov_ds_ax_ret
 
 ; Full forward pass of the transformer for one token.
 ; in BX:  input token index
