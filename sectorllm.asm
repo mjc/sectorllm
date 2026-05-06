@@ -470,11 +470,10 @@ do_matmul:
 
     ; Load single global scale from the scale segment for this layer
     mov ds, si
-    mov ebp, [0]              ; load scale for current layer
+    xor si, si
+    mov ebp, [si]             ; load scale for current layer
 
     mov ds, ax                ; DS = this layer's int8 weight segment
-
-    xor si, si
     jmp matmul                ; matmul reads DS:SI from weight row 0
 
 zero_si_zero_di_jmp_get_pos_count:
@@ -493,6 +492,10 @@ inc_bx_q_lp_tail:
 quant_cache_q_lp_tail:
     loop quant_cache.q_lp
     ret
+
+set_ds_token_emb_tail:
+    mov ds, ax
+    jmp zero_si_zero_di_jmp_get_pos_count
 
 call_set_seg_1024_jmp_get_kv_offset:
     call set_seg_1024
@@ -559,8 +562,7 @@ quant_cache:
 set_ds_token_emb:
     imul ax, bx, 16
     add ax, W_TOKEN_EMB
-    mov ds, ax
-    jmp zero_si_zero_di_jmp_get_pos_count
+    jmp set_ds_token_emb_tail
 
 ; Full forward pass of the transformer for one token.
 ; in BX:  input token index
