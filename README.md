@@ -43,7 +43,7 @@ make QEMU_ACCEL=kvm:tcg screenshot
 
 The boot sector loads the model data from disk into high memory, then runs a full transformer forward pass for each token.
 
-A python script (`quantize.py`) packs the model into a custom binary format designed for minimal decoding overhead, Weights are quantized to int8 with a global absmax scale, lookup tables for `exp` and `silu` are precomputed and embedded directly, and the Q/K/V and gate/up weight matrices are fused so the assembly can issue a single matmul call rather than three.
+A python script (`quantize.py`) packs the model into a custom binary format designed for minimal decoding overhead. Weights are quantized to int8 with a global absmax scale, lookup tables for `exp` and `silu` are precomputed and embedded directly, the Q/K/V and gate/up weight matrices are fused so the assembly can issue a single matmul call rather than three, and the tokenizer is stored as plain null-terminated strings because inference only needs token text at print time.
 
 The KV cache is quantized to int8 at runtime with a per-token scale stored in a separate buffer, keeping the cache small enough to fit in the available segment space for the full 512-token context.
 

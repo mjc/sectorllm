@@ -395,16 +395,13 @@ print_token:
     mov cx, bx                  ; cx = token index (loop counter)
     xor si, si                  ; SI = 0
 
-    ; Each entry is [int32 score][null-terminated string]
+    ; Each entry is a null-terminated string
 .find:
-    lodsd                       ; skip int32 score, SI += 4
-.skip_str:
     lodsb                       ; c=VOCAB_PTR[SI++]
     test al, al
-    jnz .skip_str               ; loop until NULL
+    jnz .find                   ; loop until NULL
     loop .find                  ; next token
 .print:
-    lodsd                       ; skip int32 score, SI += 4
     mov ah, 0x0E                ; teletype out
 .print_str:
     lodsb                       ; c=VOCAB_PTR[SI++]
@@ -455,10 +452,6 @@ set_vs_seg:
     mov dh, VS_SEG >> 8
     jmp short set_seg_128
 
-set_vc_seg:
-    mov dx, VC_SEG
-    jmp short set_seg_1024
-
 set_ks_seg:
     mov dx, KS_SEG
     jmp short set_seg_128
@@ -472,9 +465,10 @@ quant_k_cache:
     mov dx, KS_SEG
     jmp quant_cache
 
-zero_di_jmp_rmsnorm:
-    xor di, di
-    jmp do_rmsnorm
+quant_v_cache:
+    mov ax, VC_SEG
+    mov dx, VS_SEG
+    jmp quant_cache
 
 zero_si_jmp_matmul:
     xor si, si
@@ -633,10 +627,7 @@ forward:
     ; Quantize and cache K and V for this position
     pop si
     call quant_k_cache          ; KC[layer][pos] = quantize(K)
-
-    mov ax, VC_SEG
-    mov dx, VS_SEG
-    call quant_cache            ; VC[layer][pos] = quantize(V)
+    call quant_v_cache          ; VC[layer][pos] = quantize(V)
 
 
     ; Compute attention scores, softmax and weight sum of V
@@ -691,7 +682,8 @@ forward:
 
     ; Final normalization
     mov ax, W_RMS_FINAL - LAYERS * 16
-    call zero_di_jmp_rmsnorm    ; R_X = rmsnorm(R_X, w_rms_final)
+    xor di, di                  ; R_X
+    call do_rmsnorm             ; R_X = rmsnorm(R_X, w_rms_final)
 
     ; Compute logits and pick best token (use greedy argmax)
     xor bx, bx                       ; BX = token index
@@ -865,7 +857,8 @@ attention:
     push cx
 
     ; Load V vector for token t, KV head kvh = h/2
-    call set_vc_seg             ; DS =  V cache for this layer
+    mov dx, VC_SEG
+    call set_seg_1024           ; DS =  V cache for this layer
     call get_kv_offset          ; BX = offset of V[t][kvh]
 
     ; a_t = R_ATT[h][t]
