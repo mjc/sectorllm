@@ -296,19 +296,6 @@ matmul:
 
     ret
 
-; It is slower to always call this function but it saves two bytes each time!
-q16_shift:
-    shrd eax, edx, 16
-    ret
-
-; Add the matmul output into R_X in-place
-; in ES:BX: matmul output
-; Convenience wrapper around vadd for post-matmul accumulation (saves bytes)
-vadd_rx:
-    dec bh                      ; matmul leaves BX one DIM vector past output
-    xchg si, bx                 ; grab pointer from matmul
-    xor di, di                  ; R_X
-
 ; Vector addition: ES:DI += ES:SI for DIM FP16.16 elements
 ; in ES:SI: src vector (FP16.16[DIM])
 ; in ES:DI: dest vector (FP16.16[DIM])
@@ -439,23 +426,6 @@ add_bx_cx_ret:
     add bx, cx
     ret
 
-get_pos_count:
-    mov cx, [es:CUR_POS]
-    inc cx
-    ret
-
-set_vs_seg:
-    mov dh, VS_SEG >> 8
-    jmp short set_seg_128
-
-set_ks_seg:
-    mov dx, KS_SEG
-    jmp short set_seg_128
-
-set_kc_seg:
-    mov dx, KC_SEG
-    jmp short set_seg_1024
-
 quant_k_cache:
     mov ax, KC_SEG
     mov dx, KS_SEG
@@ -493,17 +463,19 @@ get_att_ptr:
     add si, cx             ; SI = &R_ATT[h][t]
     ret
 
-_bootsector_end:
-%assign bootsector_size _bootsector_end - $$
-%warning boot sector is bootsector_size bytes.
-times 510 - ($ - $$) db 0
-dw 0xAA55
+; It is slower to always call this function but it saves two bytes each time!
+q16_shift:
+    shrd eax, edx, 16
+    ret
 
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Sector 1 and 2                                                             ;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Add the matmul output into R_X in-place
+; in ES:BX: matmul output
+; Convenience wrapper around vadd for post-matmul accumulation (saves bytes)
+vadd_rx:
+    dec bh                      ; matmul leaves BX one DIM vector past output
+    xchg si, bx                 ; grab pointer from matmul
+    xor di, di                  ; R_X
+    jmp vadd
 
 ; matmul helper: 
 ; in AX:   base_Q
@@ -523,6 +495,25 @@ do_matmul:
     mov ds, ax                ; DS = this layer's int8 weight segment
 
     jmp short zero_si_jmp_matmul ; matmul reads DS:SI from weight row 0
+
+_bootsector_end:
+%assign bootsector_size _bootsector_end - $$
+%warning boot sector is bootsector_size bytes.
+times 510 - ($ - $$) db 0
+dw 0xAA55
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Sector 1 and 2                                                             ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+zero_di_jmp_get_pos_count:
+    xor di, di
+get_pos_count:
+    mov cx, [es:CUR_POS]
+    inc cx
+    ret
 
 ; Quantize K/V to int8 and save to cache
 ; Uses absmax quantization: scale = max(|x|) / 127, then q = round(x / scale)
@@ -731,13 +722,13 @@ attention:
     ; 1.QK dot products
     ; For each past token t, compute a_t = dot(Q_h, K_t) * scale
     ; and store in R_ATT[h][t]
-    call get_pos_count          ; process tokens t = 0..CUR_POS inclusive
-    xor di, di                  ; DI = t
+    call zero_di_jmp_get_pos_count ; process tokens t = 0..CUR_POS inclusive, DI = t
 .t_loop:
     push cx                     ; save token counter
 
     ; load K vector for token T, KV head kvh = h/2
-    call set_kc_seg             ; DS = int8 K cache for this layer
+    mov dx, KC_SEG
+    call set_seg_1024           ; DS = int8 K cache for this layer
     call get_kv_offset          ; BX = offset of K[t][kvh]
 
     ; Load Q vector for head h
@@ -767,7 +758,8 @@ attention:
     call get_att_ptr            ; SI = &R_ATT[h][t], CX = t * 4
     push si
     push cx
-    call set_ks_seg             ; DS = K scale cache for this layer
+    mov dx, KS_SEG
+    call set_seg_128            ; DS = K scale cache for this layer
     pop si
     mov esi, [si]               ; esi = scale_kt
 
@@ -847,8 +839,7 @@ attention:
     mov cl, HEAD_DIM
     rep stosd                   ; zero out R_XB[h]
 
-    call get_pos_count
-    xor di, di                  ; DI = t
+    call zero_di_jmp_get_pos_count ; DI = t
 .v_loop:
     push cx
 
@@ -864,7 +855,8 @@ attention:
     ; Dequantize V: multiply a_t by V scale for token t
     push ds
     push cx
-    call set_vs_seg             ; DS = V scale cache for this layer
+    mov dh, VS_SEG >> 8
+    call set_seg_128            ; DS = V scale cache for this layer
     pop si                      ; t * 4 from get_att_ptr
     imul dword [si]             ; multiply by scale_vt
     pop ds                      ; restore DS = VC_SEG
