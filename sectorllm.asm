@@ -472,6 +472,10 @@ quant_k_cache:
     mov dx, KS_SEG
     jmp quant_cache
 
+zero_di_jmp_rmsnorm:
+    xor di, di
+    jmp do_rmsnorm
+
 zero_si_jmp_matmul:
     xor si, si
     jmp matmul
@@ -687,8 +691,7 @@ forward:
 
     ; Final normalization
     mov ax, W_RMS_FINAL - LAYERS * 16
-    xor di, di                  ; R_X
-    call do_rmsnorm             ; R_X = rmsnorm(R_X, w_rms_final)
+    call zero_di_jmp_rmsnorm    ; R_X = rmsnorm(R_X, w_rms_final)
 
     ; Compute logits and pick best token (use greedy argmax)
     xor bx, bx                       ; BX = token index
