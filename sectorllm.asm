@@ -166,14 +166,12 @@ start_inference:
 
 
 ; Inverse square root approximation
-; in  EAX: x (FP16.16)
-; out EAX: 1/sqrt(x) (FP16.16)
+; in  EBP: x (FP16.16)
+; out EBP: 1/sqrt(x) (FP16.16)
 ; Clobbers: ecx
 inv_sqrt:
-    xchg eax, ebx                ; save x
-
     ; Initial guess from bit position: y ~= 2^((48-bsr(x))/2)
-    bsr ecx, ebx
+    bsr ecx, ebp
     neg cl
     add cl, 48
     shr cl, 1
@@ -186,7 +184,7 @@ inv_sqrt:
     mov esi, eax                ; esi = y
     mul eax                     ; edx:eax = y^2
     call q16_shift              ; convert to FP16.16
-    mul ebx                     ; edx:eax = x*y^2
+    mul ebp                     ; edx:eax = x*y^2
     call q16_shift              ; convert to FP16.16
     neg eax                     ; eax = -x*y^2
     add eax, 3*65536            ; eax = 3 - x*y^2 (FP16.16)
@@ -195,6 +193,7 @@ inv_sqrt:
     shr eax, 1                  ; / 2
     loop .loop
 .done:
+    xchg eax, ebp
     ret
 
 ; rmsnorm helper: sets up DS and BX before doing rmsnorm logic
@@ -226,15 +225,12 @@ rmsnorm:
 
 .eps:
     ; ss = (sum / DIM) + epsilon
-    mov eax, ebp
-    shr eax, DIM_LOG            ; eax = sum/DIM
-    inc ax ; epsilon
+    shr ebp, DIM_LOG            ; ebp = sum/DIM
+    inc bp ; epsilon
 
-    call inv_sqrt               ; eax = 1/sqrt(ss) in FP16.16
-    xchg ebp, eax               ; ebp = normalization scale
+    call inv_sqrt               ; ebp = 1/sqrt(ss) in FP16.16
 
     pop si                      ; restore SI to R_X
-    xor bx, bx                  ; restore weight pointer clobbered by inv_sqrt
     mov cl, DIM
 
 ; 2. Normalize and apply weights
