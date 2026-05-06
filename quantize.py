@@ -4,7 +4,7 @@ Output layout:
   - exp_lut       (512  * 4 bytes) exp(-i/64) LUT for softmax
   - silu_lut      (1024 * 4 bytes) silu(x) LUT for FFN gating
   - weight tensors (int32 Q16.16 or int8 + global int32 scale)
-  - tokenizer     (per token: null-terminated UTF-8 string)
+  - tokenizer     (512 uint16 offsets followed by null-terminated UTF-8 strings)
 """
 
 import os, struct
@@ -75,8 +75,19 @@ def load_tokenizer(path):
     return tokens
 
 def write_tokenizer(fout, tokens):
+    strings = []
+    offsets = []
+    offset = len(tokens) * 2
     for s in tokens:
-        fout.write(s.encode("utf-8") + b"\0")
+        encoded = s.encode("utf-8") + b"\0"
+        offsets.append(offset)
+        strings.append(encoded)
+        offset += len(encoded)
+
+    for value in offsets:
+        fout.write(struct.pack("<H", value))
+    for encoded in strings:
+        fout.write(encoded)
     print(f"  tokenizer: {len(tokens)} tokens")
 
 def main():

@@ -125,9 +125,9 @@ entry:
     mov sp, 0x7C00
 
     ; Load stage2
-    mov bx, 0x7E00
+    mov bh, 0x7E
     mov ax, 0x0202              ; AH=02 read, AL=2 sectors
-    mov cx, 0x0002              ; CH=0 cylinder, CL=2 sector
+    mov cl, 2                   ; assume CH=0, sector 2
     int 0x13
     ; assume no error ;)
 
@@ -375,16 +375,9 @@ apply_rope:
 print_token:
     push VOCAB_PTR              ; DS = VOCAB_PTR
     pop ds
-    mov cx, bx                  ; cx = token index (loop counter)
-    xor si, si                  ; SI = 0
-
-    ; Each entry is a null-terminated string
-.find:
-    lodsb                       ; c=VOCAB_PTR[SI++]
-    test al, al
-    jnz .find                   ; loop until NULL
-    loop .find                  ; next token
-.print:
+    push bx
+    shl bx, 1
+    mov si, [bx]
     mov ah, 0x0E                ; teletype out
 .print_str:
     lodsb                       ; c=VOCAB_PTR[SI++]
@@ -393,6 +386,7 @@ print_token:
     int 0x10                    ; print c
     jmp .print_str
 .done:
+    pop bx
     ret
 
 ; Set DS to a segmented address for KV cache access.
@@ -421,10 +415,6 @@ dap:
     dw 0x0000                   ; target offset
     dw 0x2000                   ; target segment
     dq 3                        ; start lba (sector 2)
-
-add_bx_cx_ret:
-    add bx, cx
-    ret
 
 quant_k_cache:
     mov ax, KC_SEG
@@ -496,6 +486,13 @@ do_matmul:
 
     jmp short zero_si_jmp_matmul ; matmul reads DS:SI from weight row 0
 
+zero_di_jmp_get_pos_count:
+    xor di, di
+get_pos_count:
+    mov cx, [es:CUR_POS]
+    inc cx
+    ret
+
 _bootsector_end:
 %assign bootsector_size _bootsector_end - $$
 %warning boot sector is bootsector_size bytes.
@@ -508,11 +505,8 @@ dw 0xAA55
 ;; Sector 1 and 2                                                             ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-zero_di_jmp_get_pos_count:
-    xor di, di
-get_pos_count:
-    mov cx, [es:CUR_POS]
-    inc cx
+add_bx_cx_ret:
+    add bx, cx
     ret
 
 ; Quantize K/V to int8 and save to cache
