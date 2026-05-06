@@ -54,7 +54,8 @@ org 0x7c00
 ; Feed-forward, Pre-RMSNorm weights
 %define P_RMS_FFN   (LAYERS * DIM * 4 / 16)
 ; FFN down-projection
-%define P_W2_Q      (LAYERS * HIDDEN * DIM / 16)
+%define P_W2_Q_L    0x300       ; padded per-layer stride
+%define P_W2_Q      (LAYERS * P_W2_Q_L)
 %define P_W2_S      1
 
 ; FFN Gate and up-projection (W1 and W3 concatenated)
@@ -129,9 +130,11 @@ entry:
     mov ax, 0x0202              ; AH=02 read, AL=2 sectors
     mov cl, 2                   ; assume CH=0, sector 2
     int 0x13
+    push 0x2000                 ; LUT segment
+    pop fs
     ; Build the DAP on the stack using zero registers that survive the CHS read.
     push 3
-    push 0x2000
+    push fs
     push es
     push 64
     push 0x10
@@ -152,8 +155,6 @@ entry:
 
 start_inference:
     inc bx                      ; BOS
-    push 0x2000                 ; LUT segment
-    pop fs
 
 .gen_loop:
     call forward
@@ -636,7 +637,7 @@ forward:
 
     ; Project back down to DIM
     mov ax, W_W2_Q
-    mov cx, 0x2B0
+    mov ch, P_W2_Q_L >> 8
     mov edx, (HIDDEN << 16) | DIM
     mov di, R_HB
     mov bx, R_XB

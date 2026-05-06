@@ -16,6 +16,7 @@ SRC_TOK    = os.path.join(MODELS_DIR, "tok512.bin")
 DST        = os.path.join(MODELS_DIR, "stories260K_int.bin")
 
 SCALE = 65536
+W2_Q_LAYER_PARAS = 0x300
 
 SKIP_QUANT = {
     "token_embedding_table", "rms_att_weight", "rms_ffn_weight",
@@ -59,6 +60,23 @@ def write_q8(fout, w, name):
     err = float(np.max(np.abs(q.astype(np.float64) * amax / 127.0 - flat)))
     print(f"  {name:<30}  Q8   {flat.size:>8}  err={err:.5f}  "
           f"@ 0x{0x20000 + offset:X}")
+
+def write_q8_padded_layers(fout, w, name, layer_stride_paras):
+    layers = w.reshape(w.shape[0], -1).astype(np.float64)
+    amax = max(np.max(np.abs(layers)), 1e-9)  # avoid div-by-zero
+    q = np.round(layers / amax * 127.0).clip(-127, 127).astype(np.int8)
+    scale_q = np.round(amax / 127.0 * SCALE).astype(np.int32)
+    offset = fout.tell()
+    layer_stride = layer_stride_paras * 16
+    for row in q:
+        data = row.tobytes()
+        fout.write(data)
+        fout.write(b"\x00" * (layer_stride - len(data)))
+    fout.write(struct.pack("<i", int(scale_q)))
+    pad_to_paragraph(fout)
+    err = float(np.max(np.abs(q.astype(np.float64) * amax / 127.0 - layers)))
+    print(f"  {name:<30}  Q8   {layers.size:>8}  err={err:.5f}  "
+          f"stride=0x{layer_stride_paras:X}p  @ 0x{0x20000 + offset:X}")
 
 def write_tensor(fout, w, name):
     (write_fixed if name in SKIP_QUANT else write_q8)(fout, w, name)
@@ -134,7 +152,8 @@ def main():
 
         # Fuse gate and up projections for the FFN (SwiGLU)
         w1 = load_w(fin, nl * hidden * dim).reshape(nl, hidden, dim)
-        blk("w2", nl * dim * hidden)
+        w2 = load_w(fin, nl * dim * hidden).reshape(nl, dim, hidden)
+        write_q8_padded_layers(fout, w2, "w2", W2_Q_LAYER_PARAS)
         w3 = load_w(fin, nl * hidden * dim).reshape(nl, hidden, dim)
         write_tensor(fout, np.concatenate([w1, w3], axis=1).flatten(), "w13")
 
