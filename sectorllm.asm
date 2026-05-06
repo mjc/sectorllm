@@ -397,12 +397,10 @@ set_seg_1024:
 set_seg_128:
     mov cl, 7
 .do_seg:
-    push ax
     mov ax, [es:CUR_LAYER]
     shl ax, cl                  ; ax = CUR_LAYER * stride
     add dx, ax                  ; dx = base + layer offset
     mov ds, dx                  ; DS = target segment
-    pop ax
     ret
 
 quant_kv_cache:
@@ -513,11 +511,6 @@ dw 0xAA55
 ; Quantize K/V to int8 and save to cache
 ; Uses absmax quantization: scale = max(|x|) / 127, then q = round(x / scale)
 ; in SI: input vector (FP16.16[KV_DIM])
-; in AX: int8 cache segment base (KC_SEG or VC_SEG)
-; in DX: scale segment base (KS_SEG or VS_SEG)
-set_seg_get_kv_ptr:
-    jmp call_set_seg_1024_jmp_get_kv_offset
-
 quant_cache:
     ; Find max absolute value
 .max_lp:
@@ -706,7 +699,7 @@ attention:
 
     ; load K vector for token T, KV head kvh = h/2
     mov dx, KC_SEG
-    call set_seg_get_kv_ptr     ; DS = K cache, BX = offset of K[t][kvh]
+    call call_set_seg_1024_jmp_get_kv_offset ; DS = K cache, BX = offset of K[t][kvh]
 
     ; Load Q vector for head h
     imul si, bp, 32             ; h * 32
@@ -822,7 +815,7 @@ attention:
 
     ; Load V vector for token t, KV head kvh = h/2
     mov dx, VC_SEG
-    call set_seg_get_kv_ptr     ; DS = V cache, BX = offset of V[t][kvh]
+    call call_set_seg_1024_jmp_get_kv_offset ; DS = V cache, BX = offset of V[t][kvh]
 
     ; a_t = R_ATT[h][t]
     call get_att_ptr            ; SI = &R_ATT[h][t]
