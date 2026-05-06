@@ -13,6 +13,35 @@ It can run the [stories260K](https://huggingface.co/karpathy/tinyllamas/blob/mai
 ./download.sh && python3 quantize.py && make run
 ```
 
+## Testing
+```
+make test
+```
+
+The default harness assembles `sectorllm.asm`, checks the boot signature, and
+enforces the boot-sector and full-code size limits. If
+`models/stories260K_int.bin` exists, it also builds `boot.img`, verifies that
+the image starts with the assembled code, polls QEMU until generation stops,
+prints the generated final story, and exits nonzero unless it exactly matches
+the expected text.
+
+To include a short QEMU boot smoke test:
+```
+RUN_QEMU_SMOKE=1 make test
+```
+
+To assert the final generated display text, poll QEMU until generation stops,
+then capture VGA text memory and check for `Thank you, mommy!`:
+```
+make final-text
+```
+
+For fixed timestamp checks, for example 75 and 80 seconds:
+```
+QEMU_FINAL_CHECKS=75,80 make final-text
+```
+
+
 ## How it works
 The boot sector loads the model data from disk into high memory, then runs a full transformer forward pass for each token.
 
