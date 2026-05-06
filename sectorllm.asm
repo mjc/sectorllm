@@ -425,10 +425,6 @@ quant_v_cache:
     mov dx, VS_SEG
     jmp quant_cache
 
-zero_si_jmp_matmul:
-    xor si, si
-    jmp matmul
-
 ; Compute the byte offset into the KV cache for a given token and KV head
 ; The cache layout is [token][kv_head][DIM] with each element being int8
 ; in DI:   t (token position)
@@ -484,7 +480,8 @@ do_matmul:
 
     mov ds, ax                ; DS = this layer's int8 weight segment
 
-    jmp short zero_si_jmp_matmul ; matmul reads DS:SI from weight row 0
+    xor si, si
+    jmp matmul                ; matmul reads DS:SI from weight row 0
 
 zero_di_jmp_get_pos_count:
     xor di, di
