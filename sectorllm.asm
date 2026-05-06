@@ -491,6 +491,10 @@ quant_cache_q_lp_tail:
     loop quant_cache.q_lp
     ret
 
+mov_ds_ax_ret:
+    mov ds, ax
+    ret
+
 _bootsector_end:
 %assign bootsector_size _bootsector_end - $$
 %warning boot sector is bootsector_size bytes.
@@ -550,8 +554,7 @@ quant_cache:
 set_ds_token_emb:
     imul ax, bx, 16
     add ax, W_TOKEN_EMB
-    mov ds, ax
-    ret
+    jmp mov_ds_ax_ret
 
 ; Full forward pass of the transformer for one token.
 ; in BX:  input token index
