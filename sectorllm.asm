@@ -164,8 +164,7 @@ start_inference:
     call print_token
     pop bx
     inc word [es:CUR_POS]
-    cmp word [es:CUR_POS], TOKEN_COUNT
-    jl .gen_loop
+    jmp .gen_loop
 .halt:
     jmp $
 
@@ -462,9 +461,17 @@ zero_si_jmp_matmul:
     xor si, si
     jmp matmul
 
-rxb_do_rmsnorm:
-    mov di, R_XB
-    jmp do_rmsnorm
+; Compute the byte offset into the KV cache for a given token and KV head
+; The cache layout is [token][kv_head][DIM] with each element being int8
+; in DI:   t (token position)
+; in BP:   h (attention head index)
+; out BX:  t * KV_DIM + kvh * HEAD_DIM
+get_kv_offset:
+    imul bx, di, 32 ; bx = t * 32 (KV_DIM bytes per token)
+    mov cx, bp ; cx = h
+    shr cx, 1  ; cx = kvh = h / 2 (2 attention heads share each KV head)
+    shl cx, 3  ; cx = kvh * 8 (HEAD_DIM bytes per KV head)
+    jmp short add_bx_cx_ret ; bx = offset of this token's KV head slice
 
 _bootsector_end:
 %assign bootsector_size _bootsector_end - $$
@@ -477,18 +484,6 @@ dw 0xAA55
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Sector 1 and 2                                                             ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-; Compute the byte offset into the KV cache for a given token and KV head
-; The cache layout is [token][kv_head][DIM] with each element being int8
-; in DI:   t (token position)
-; in BP:   h (attention head index)
-; out BX:  t * KV_DIM + kvh * HEAD_DIM
-get_kv_offset:
-    imul bx, di, 32 ; bx = t * 32 (KV_DIM bytes per token)
-    mov cx, bp ; cx = h
-    shr cx, 1  ; cx = kvh = h / 2 (2 attention heads share each KV head)
-    shl cx, 3  ; cx = kvh * 8 (HEAD_DIM bytes per KV head)
-    jmp short add_bx_cx_ret ; bx = offset of this token's KV head slice
 
 ; Compute a pointer into the attention score buffer.
 ; R_ATT layout is [head][token], each element being FP16.16
@@ -591,7 +586,7 @@ forward:
 .layer:
     ; Normalize input before attention
     mov ax, W_RMS_ATT
-    call rxb_do_rmsnorm         ; R_XB = rmsnorm(R_X, w_rms_att[layer])
+    call do_rmsnorm             ; R_XB = rmsnorm(R_X, w_rms_att[layer])
 
 
 
@@ -647,7 +642,7 @@ forward:
 
     ; Normalize before FFN
     mov ax, W_RMS_FFN
-    call rxb_do_rmsnorm         ; R_XB = rmsnorm(R_X, w_rms_ffn[layer])
+    call do_rmsnorm             ; R_XB = rmsnorm(R_X, w_rms_ffn[layer])
 
     ; Project up to hidden dim
     mov si, W_W13_S
