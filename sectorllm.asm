@@ -292,10 +292,9 @@ matmul:
     call q16_shift              ; eax = result in FP16.16
 
 ; Store result
-    pop bx
-    mov [es:bx], eax
-    add bx, 4                   ; advance output pointer
-
+    pop di                      ; output pointer
+    stosd                       ; store result and advance output pointer
+    mov bx, di                  ; keep advanced output pointer for caller/next row
     pop di
     pop dx
     pop ax
@@ -460,8 +459,12 @@ add_si_cx_ret:
     ret
 
 set_vs_seg:
-    mov dx, VS_SEG
+    mov dh, VS_SEG >> 8
     jmp short set_seg_128
+
+set_kc_seg:
+    mov dx, KC_SEG
+    jmp short set_seg_1024
 
 zero_si_jmp_matmul:
     xor si, si
@@ -474,9 +477,8 @@ zero_si_jmp_matmul:
 ; out BX:  t * KV_DIM + kvh * HEAD_DIM
 get_kv_offset:
     imul bx, di, 32 ; bx = t * 32 (KV_DIM bytes per token)
-    mov cx, bp ; cx = h
-    shr cx, 1  ; cx = kvh = h / 2 (2 attention heads share each KV head)
-    shl cx, 3  ; cx = kvh * 8 (HEAD_DIM bytes per KV head)
+    imul cx, bp, 4
+    and cl, 0x18 ; cx = (h / 2) * HEAD_DIM
     jmp short add_bx_cx_ret ; bx = offset of this token's KV head slice
 
 _bootsector_end:
@@ -739,8 +741,7 @@ attention:
     push cx                     ; save token counter
 
     ; load K vector for token T, KV head kvh = h/2
-    mov dx, KC_SEG
-    call set_seg_1024           ; DS = int8 K cache for this layer
+    call set_kc_seg             ; DS = int8 K cache for this layer
     call get_kv_offset          ; BX = offset of K[t][kvh]
 
     ; Load Q vector for head h
