@@ -728,7 +728,7 @@ attention:
     call get_att_ptr            ; SI = &R_ATT[h][t], CX = t * 4
     push si
     push cx
-    mov dx, KS_SEG
+    mov dh, KS_SEG >> 8
     call set_seg_128            ; DS = K scale cache for this layer
     pop si
     mov esi, [si]               ; esi = scale_kt
@@ -814,7 +814,7 @@ attention:
     push cx
 
     ; Load V vector for token t, KV head kvh = h/2
-    mov dx, VC_SEG
+    mov dh, VC_SEG >> 8
     call call_set_seg_1024_jmp_get_kv_offset ; DS = V cache, BX = offset of V[t][kvh]
 
     ; a_t = R_ATT[h][t]
