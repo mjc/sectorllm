@@ -100,7 +100,6 @@ def main():
 
     with open(SRC_MODEL, "rb") as fin, open(DST, "wb") as fout:
         fin.read(28)  # skip header
-        fout.write(b"\x00" * 32) # Make space for our header
 
         print("Lookup tables:")
         for lut, label in [(make_exp_lut(512), "exp_lut"), (make_silu_lut(1024), "silu_lut")]:
@@ -145,16 +144,8 @@ def main():
         write_tokenizer(fout, tokens)
 
     size, orig = os.path.getsize(DST), os.path.getsize(SRC_MODEL)
-
-    sectors = (size + 511) // 512
-    with open(DST, "r+b") as fout:
-        fout.seek(0)
-        # write header
-        fout.write(struct.pack("<8i", dim, hidden, nl, nh, nkv, vocab, seq, sectors))
-
     print(f"\nOriginal: {orig//1024}KB  Output: {size//1024}KB  "
           f"({100*size//orig}% of original)")
-    print(f"Total Sectors to load: {sectors}")
 
 if __name__ == "__main__":
     main()
