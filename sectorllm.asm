@@ -122,7 +122,7 @@ org 0x7c00
 ; It also contains the main inference loop and utility subroutines.
 entry:
     ; Set up segments
-    mov sp, 0x7C00
+    mov sp, 0x7BF0
 
     ; Load stage2
     mov bh, 0x7E
@@ -130,9 +130,6 @@ entry:
     mov cl, 2                   ; assume CH=0, sector 2
     int 0x13
     ; Build the DAP on the stack using zero registers that survive the CHS read.
-    push si
-    push di
-    push ds
     push 3
     push 0x2000
     push es
@@ -415,14 +412,18 @@ set_seg_128:
     pop ax
     ret
 
-quant_k_cache:
+quant_kv_cache:
     mov ax, KC_SEG
     mov dx, KS_SEG
-    jmp quant_cache
-
-quant_v_cache:
+    call .quant
     mov ax, VC_SEG
     mov dx, VS_SEG
+ .quant:
+    push ax
+    push dx
+    mov cl, KV_DIM
+    push si
+    xor ebx, ebx
     jmp quant_cache
 
 ; Compute the byte offset into the KV cache for a given token and KV head
@@ -508,13 +509,7 @@ dw 0xAA55
 ; in AX: int8 cache segment base (KC_SEG or VC_SEG)
 ; in DX: scale segment base (KS_SEG or VS_SEG)
 quant_cache:
-    push ax                     ; save cache segment base
-    push dx                     ; save scale segment base
-
     ; Find max absolute value
-    mov cl, KV_DIM
-    push si                     ; save for pass 2
-    xor ebx, ebx                ; ebx = running_max
 .max_lp:
     es lodsd
     cdq                         ; sign-extend into edx
@@ -600,8 +595,7 @@ forward:
 
     ; Quantize and cache K and V for this position
     pop si
-    call quant_k_cache          ; KC[layer][pos] = quantize(K)
-    call quant_v_cache          ; VC[layer][pos] = quantize(V)
+    call quant_kv_cache         ; KC/VC[layer][pos] = quantize(K/V)
 
 
     ; Compute attention scores, softmax and weight sum of V
