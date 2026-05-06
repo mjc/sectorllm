@@ -147,12 +147,11 @@ entry:
     add dword [si + 6], 0x00400800 ; add 64 to lba, 0x800 to segment
     loop .load_model
 
-    ; Set up scratch segment (ES)
-    push 0x8000
-    pop es
+    ; Recover ES=0x8000 and BX=0 from the final DAP segment:offset pair.
+    les bx, [si + 4]
 
 start_inference:
-    mov bx, 1                   ; BOS
+    inc bx                      ; BOS
     push 0x2000                 ; LUT segment
     pop fs
 
@@ -493,6 +492,8 @@ quant_cache_q_lp_tail:
 
 mov_ds_ax_ret:
     mov ds, ax
+    xor si, si
+    xor di, di
     ret
 
 _bootsector_end:
@@ -562,8 +563,6 @@ set_ds_token_emb:
 forward:
     ; Load token embedding into R_X
     call set_ds_token_emb
-    xor si, si
-    xor di, di                  ; DI = R_X
     mov cl, DIM * 2             ; dword
     rep movsw                   ; R_X = embedding[token]
 
@@ -669,8 +668,6 @@ forward:
     call set_ds_token_emb
 
     xor ebp, ebp                ; ebp dot accumulator
-    xor si, si                  ; embedding row offset
-    xor di, di                  ; DI = R_X
     mov cl, DIM
 .dot:
     lodsd                       ; eax = embedding[i][j], SI += 4
