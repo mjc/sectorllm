@@ -439,7 +439,8 @@ get_kv_offset:
     imul bx, di, 32 ; bx = t * 32 (KV_DIM bytes per token)
     imul cx, bp, 4
     and cl, 0x18 ; cx = (h / 2) * HEAD_DIM
-    jmp short add_bx_cx_ret ; bx = offset of this token's KV head slice
+    add bx, cx ; bx = offset of this token's KV head slice
+    ret
 
 ; Compute a pointer into the attention score buffer.
 ; R_ATT layout is [head][token], each element being FP16.16
@@ -504,10 +505,6 @@ dw 0xAA55
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Sector 1 and 2                                                             ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-add_bx_cx_ret:
-    add bx, cx
-    ret
 
 ; Quantize K/V to int8 and save to cache
 ; Uses absmax quantization: scale = max(|x|) / 127, then q = round(x / scale)
