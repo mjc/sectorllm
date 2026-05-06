@@ -129,15 +129,19 @@ entry:
     mov ax, 0x0202              ; AH=02 read, AL=2 sectors
     mov cl, 2                   ; assume CH=0, sector 2
     int 0x13
-    ; assume no error ;)
-
-    ; Set up scratch segment (ES)
-    push 0x8000
-    pop es
+    ; Build the DAP on the stack using zero registers that survive the CHS read.
+    push si
+    push di
+    push ds
+    push 3
+    push 0x2000
+    push es
+    push 64
+    push 0x10
+    mov si, sp
 
     ; Load the model at 0x2000:0
     mov cl, 12
-    mov si, dap
 
 .load_model:
     mov ah, 0x42
@@ -145,6 +149,10 @@ entry:
 
     add dword [si + 6], 0x00400800 ; add 64 to lba, 0x800 to segment
     loop .load_model
+
+    ; Set up scratch segment (ES)
+    push 0x8000
+    pop es
 
 start_inference:
     mov bx, 1                   ; BOS
@@ -406,15 +414,6 @@ set_seg_128:
     mov ds, dx                  ; DS = target segment
     pop ax
     ret
-
-; Data section
-dap:
-    db 0x10                     ; size of DAP
-    db 0                        ; reserved
-    dw 64                       ; number of sectors to read
-    dw 0x0000                   ; target offset
-    dw 0x2000                   ; target segment
-    dq 3                        ; start lba (sector 2)
 
 quant_k_cache:
     mov ax, KC_SEG
