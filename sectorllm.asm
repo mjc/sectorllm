@@ -494,6 +494,10 @@ quant_cache_q_lp_tail:
     loop quant_cache.q_lp
     ret
 
+call_set_seg_1024_jmp_get_kv_offset:
+    call set_seg_1024
+    jmp get_kv_offset
+
 _bootsector_end:
 %assign bootsector_size _bootsector_end - $$
 %warning boot sector is bootsector_size bytes.
@@ -512,8 +516,7 @@ dw 0xAA55
 ; in AX: int8 cache segment base (KC_SEG or VC_SEG)
 ; in DX: scale segment base (KS_SEG or VS_SEG)
 set_seg_get_kv_ptr:
-    call set_seg_1024
-    jmp get_kv_offset
+    jmp call_set_seg_1024_jmp_get_kv_offset
 
 quant_cache:
     ; Find max absolute value
@@ -823,7 +826,7 @@ attention:
 
     ; a_t = R_ATT[h][t]
     call get_att_ptr            ; SI = &R_ATT[h][t]
-    mov eax, [es:si]            ; eax = a_t
+    es lodsd                    ; eax = a_t
 
     ; Dequantize V: multiply a_t by V scale for token t
     push ds
