@@ -469,11 +469,10 @@ do_matmul:
 
     ; Load single global scale from the scale segment for this layer
     mov ds, si
-    mov ebp, [0]              ; load scale for current layer
+    xor si, si
+    mov ebp, [si]             ; load scale for current layer
 
     mov ds, ax                ; DS = this layer's int8 weight segment
-
-    xor si, si
     jmp matmul                ; matmul reads DS:SI from weight row 0
 
 zero_si_zero_di_ret:
@@ -693,6 +692,7 @@ attention:
     ; For each past token t, compute a_t = dot(Q_h, K_t) * scale
     ; and store in R_ATT[h][t]
     call zero_di_jmp_get_pos_count ; process tokens t = 0..CUR_POS inclusive, DI = t
+    push cx
 .t_loop:
     push cx                     ; save token counter
 
@@ -749,10 +749,10 @@ attention:
     ; 2. Softmax over attention scores
     ; Converts raw R_ATT[h][0..pos] to probabilities
 .softmax:
+    pop cx
     xor di, di
     call get_att_ptr            ; SI = &R_ATT[h][0]
     mov di, si
-    call get_pos_count
 
     ; Find max score
     push di
