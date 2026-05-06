@@ -244,6 +244,7 @@ rmsnorm:
     stosd                 ; write to output, DI += 4
     loop .norm
 .done:
+    xchg di, bx
     ret
 
 ; Multiply an int8 matrix by a FP16.16 vector
@@ -574,7 +575,6 @@ forward:
     mov ax, W_WQKV_Q
     mov ch, 2
     mov edx, (DIM << 16) | (DIM + 2*KV_DIM) ; rows=96 (Q+K+V), cols=64
-    xchg di, bx
     call do_matmul              ; R_QKV = [Q | K | V] = w_wqkv * R_XB
 
 
@@ -619,7 +619,6 @@ forward:
     mov ax, W_W13_Q
     mov cx, 0x560
     mov edx, (DIM << 16) | (2*HIDDEN)
-    xchg di, bx
     call do_matmul              ; R_HB = [gate | up] = w_w13 * R_XB
 
     ; Apply SiLU gating
@@ -643,6 +642,7 @@ forward:
     mov ax, W_RMS_FINAL - LAYERS * 16
     xor di, di                  ; R_X
     call do_rmsnorm             ; R_X = rmsnorm(R_X, w_rms_final)
+    xchg di, bx
 
     ; Compute logits and pick best token (use greedy argmax)
     xor bx, bx                       ; BX = token index
