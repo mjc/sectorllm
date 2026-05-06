@@ -492,6 +492,10 @@ call_set_seg_1024_jmp_get_kv_offset:
     call set_seg_1024
     jmp get_kv_offset
 
+quant_cache_q_lp_tail:
+    loop quant_cache.q_lp
+    ret
+
 _bootsector_end:
 %assign bootsector_size _bootsector_end - $$
 %warning boot sector is bootsector_size bytes.
@@ -544,8 +548,7 @@ quant_cache:
     idiv ebp                    ; eax = round(x/scale), clamped to int8
     mov [bx], al                ; store quantized byte
     inc bx
-    loop .q_lp
-    ret
+    jmp quant_cache_q_lp_tail
 
 set_ds_token_emb:
     imul ax, bx, 16
