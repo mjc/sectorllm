@@ -314,6 +314,14 @@ matmul:
 
     ret
 
+; Add the matmul output into R_X in-place
+; in ES:BX: matmul output
+; Convenience wrapper around vadd for post-matmul accumulation (saves bytes)
+vadd_rx:
+    dec bh                      ; matmul leaves BX one DIM vector past output
+    xchg si, bx                 ; grab pointer from matmul
+    xor di, di                  ; R_X
+
 ; Vector addition: ES:DI += ES:SI for DIM FP16.16 elements
 ; in ES:SI: src vector (FP16.16[DIM])
 ; in ES:DI: dest vector (FP16.16[DIM])
@@ -441,6 +449,8 @@ quant_kv_cache:
 ; in DI:   t (token position)
 ; in BP:   h (attention head index)
 ; out BX:  t * KV_DIM + kvh * HEAD_DIM
+call_set_seg_1024_jmp_get_kv_offset:
+    call set_seg_1024
 get_kv_offset:
     imul bx, di, 32 ; bx = t * 32 (KV_DIM bytes per token)
     imul cx, bp, 4
@@ -465,15 +475,6 @@ q16_shift:
     shrd eax, edx, 16
     ret
 
-; Add the matmul output into R_X in-place
-; in ES:BX: matmul output
-; Convenience wrapper around vadd for post-matmul accumulation (saves bytes)
-vadd_rx:
-    dec bh                      ; matmul leaves BX one DIM vector past output
-    xchg si, bx                 ; grab pointer from matmul
-    xor di, di                  ; R_X
-    jmp vadd
-
 zero_si_zero_di_ret:
     xor si, si
     xor di, di
@@ -486,13 +487,11 @@ get_pos_count:
     inc cx
     ret
 
+set_ds_token_emb:
+    imul ax, bx, 16
+    add ax, W_TOKEN_EMB
 set_ds_token_emb_tail:
     mov ds, ax
-    jmp zero_si_zero_di_ret
-
-call_set_seg_1024_jmp_get_kv_offset:
-    call set_seg_1024
-    jmp get_kv_offset
 
 quant_cache_q_lp_tail:
     loop quant_cache.q_lp
@@ -551,11 +550,6 @@ quant_cache:
     mov [bx], al                ; store quantized byte
     inc bx
     jmp quant_cache_q_lp_tail
-
-set_ds_token_emb:
-    imul ax, bx, 16
-    add ax, W_TOKEN_EMB
-    jmp set_ds_token_emb_tail
 
 ; Full forward pass of the transformer for one token.
 ; in BX:  input token index
