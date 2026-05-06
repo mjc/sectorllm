@@ -91,9 +91,9 @@ org 0x7c00
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 %define R_X       0x0000    ; FP16.16[DIM]
 %define R_XB      0x0100    ; FP16.16[DIM]
-%define R_XB2     0x0200    ; FP16.16[VOCAV] (overlaps R_QKV and R_HB)
-%define R_QKV     0x0300    ; 384 bytes (Q=64, K=16, V=16)
-%define R_HB      0x0480    ; FP16.16[HIDDEN]
+%define R_HB      0x0200    ; FP16.16[2*HIDDEN], overlaps dead R_QKV
+%define R_QKV     0x0200    ; 384 bytes (Q=64, K=16, V=16), overlaps dead R_HB
+%define R_XB2     0x0300    ; FP16.16[DIM], overlaps dead K/V tail of R_QKV
 
 ; Global State Variables
 %define R_MAX     0x09E0    ; dword
@@ -488,6 +488,10 @@ get_pos_count:
     inc cx
     ret
 
+zero_di_ret:
+    xor di, di
+    ret
+
 quant_cache_q_lp_tail:
     loop quant_cache.q_lp
     ret
@@ -557,8 +561,7 @@ set_ds_token_emb:
     add ax, W_TOKEN_EMB
     mov ds, ax
     xor si, si
-    xor di, di
-    ret
+    jmp zero_di_ret
 
 ; Full forward pass of the transformer for one token.
 ; in BX:  input token index
@@ -582,8 +585,7 @@ forward:
     mov ax, W_WQKV_Q
     mov ch, 2
     mov edx, (DIM << 16) | (DIM + 2*KV_DIM) ; rows=96 (Q+K+V), cols=64
-    mov di, R_XB
-    mov bx, R_QKV
+    xchg di, bx
     call do_matmul              ; R_QKV = [Q | K | V] = w_wqkv * R_XB
 
 
@@ -628,8 +630,7 @@ forward:
     mov ax, W_W13_Q
     mov cx, 0x560
     mov edx, (DIM << 16) | (2*HIDDEN)
-    mov di, R_XB
-    mov bx, R_HB
+    xchg di, bx
     call do_matmul              ; R_HB = [gate | up] = w_w13 * R_XB
 
     ; Apply SiLU gating
@@ -639,8 +640,6 @@ forward:
     mov ax, W_W2_Q
     mov ch, P_W2_Q_L >> 8
     mov edx, (HIDDEN << 16) | DIM
-    mov di, R_HB
-    mov bx, R_XB
     call do_matmul              ; R_XB = w_w2 * R_HB
 
     ; Residual connection
@@ -869,6 +868,7 @@ attention:
 ; where silu(x) = x * sigmoid(x), looked up from a precomputed table
 silu_gate:
     mov di, R_HB                ; DI = gate vector
+    push di
     mov si, R_HB+HIDDEN*4       ; SI = up vector
     mov cl, HIDDEN
 .lp:
@@ -886,6 +886,8 @@ silu_gate:
     call q16_shift              ; shift back to FP16.16
     stosd                       ; gate[i] = res, DI += 4
     loop .lp
+    xchg di, bx
+    pop di
     ret
 
 _code_end:
