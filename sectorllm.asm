@@ -151,7 +151,6 @@ entry:
     loop .load_model
 
 start_inference:
-    mov [es:CUR_POS], cx        ; cur_pos=0
     mov bx, 1                   ; BOS
     push 0x2000                 ; LUT segment
     pop fs
@@ -460,6 +459,10 @@ add_si_cx_ret:
 
 set_vs_seg:
     mov dh, VS_SEG >> 8
+    jmp short set_seg_128
+
+set_ks_seg:
+    mov dx, KS_SEG
     jmp short set_seg_128
 
 set_kc_seg:
@@ -771,8 +774,7 @@ attention:
     call get_att_ptr            ; SI = &R_ATT[h][t], CX = t * 4
     push si
     push cx
-    mov dx, KS_SEG
-    call set_seg_128            ; DS = K scale cache for this layer
+    call set_ks_seg             ; DS = K scale cache for this layer
     pop si
     mov esi, [si]               ; esi = scale_kt
 
