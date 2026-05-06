@@ -122,10 +122,6 @@ org 0x7c00
 ; It also contains the main inference loop and utility subroutines.
 entry:
     ; Set up segments
-    xor ax, ax
-    mov ds, ax
-    mov ss, ax
-    mov es, ax
     mov sp, 0x7C00
 
     ; Load stage2
@@ -485,6 +481,18 @@ get_kv_offset:
     and cl, 0x18 ; cx = (h / 2) * HEAD_DIM
     jmp short add_bx_cx_ret ; bx = offset of this token's KV head slice
 
+; Compute a pointer into the attention score buffer.
+; R_ATT layout is [head][token], each element being FP16.16
+; in BP:  h (head index)
+; in DI:  t (token position)
+; out SI: &R_ATT[h][t]
+get_att_ptr:
+    imul si, bp, 2048      ; h * 2048 (SEG * 4 bytes)
+    add si, R_ATT          ; SI = base of this head's attention scores
+    imul cx, di, 4         ; cx = t * 4 (4 bytes per score)
+    add si, cx             ; SI = &R_ATT[h][t]
+    ret
+
 _bootsector_end:
 %assign bootsector_size _bootsector_end - $$
 %warning boot sector is bootsector_size bytes.
@@ -496,18 +504,6 @@ dw 0xAA55
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Sector 1 and 2                                                             ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-; Compute a pointer into the attention score buffer.
-; R_ATT layout is [head][token], each element being FP16.16
-; in BP:  h (head index)
-; in DI:  t (token position)
-; out SI: &R_ATT[h][t]
-get_att_ptr:
-    imul si, bp, 2048	   ; h * 2048 (SEG * 4 bytes)
-    add si, R_ATT          ; SI = base of this head's attention scores
-    imul cx, di, 4         ; cx = t * 4 (4 bytes per score)
-    add si, cx             ; SI = &R_ATT[h][t]
-    ret
 
 ; matmul helper: 
 ; in AX:   base_Q
