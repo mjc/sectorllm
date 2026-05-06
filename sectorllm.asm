@@ -247,6 +247,25 @@ rmsnorm:
     xchg di, bx
     ret
 
+; matmul helper:
+; in AX:   base_Q
+; in CX:   layer stride
+; in EDX:  (rows<<16) | cols
+; ES:DI: input vector
+; ES:BX: output vector
+do_matmul:
+    imul si, cx, LAYERS        ; SI = scale segment delta = stride * layers
+    add si, ax                 ; SI = scale segment base
+    imul cx, [es:CUR_LAYER]    ; cx = layer * stride (paragraphs)
+    add ax, cx                 ; ax = weight base + layer*stride
+
+    ; Load single global scale from the scale segment for this layer.
+    mov ds, si
+    xor si, si
+    mov ebp, [si]
+
+    mov ds, ax                 ; DS = this layer's int8 weight segment
+
 ; Multiply an int8 matrix by a FP16.16 vector
 ; in DS:SI:     int8 weight matrix (row-major)
 ; in ES:DI:     input vector (FP16.16[COLS])
@@ -455,26 +474,6 @@ vadd_rx:
     xor di, di                  ; R_X
     jmp vadd
 
-; matmul helper: 
-; in AX:   base_Q
-; in CX:   layer stride
-; in EDX:  (rows<<16) | cols
-; ES:DI: input vector
-; ES:BX: output vector
-do_matmul:
-    imul si, cx, LAYERS        ; SI = scale segment delta = stride * layers
-    add si, ax                 ; SI = scale segment base
-    imul cx, [es:CUR_LAYER]   ; cx = layer * stride (paragraphs)
-    add ax, cx                ; ax = weight base + layer*stride
-
-    ; Load single global scale from the scale segment for this layer
-    mov ds, si
-    xor si, si
-    mov ebp, [si]             ; load scale for current layer
-
-    mov ds, ax                ; DS = this layer's int8 weight segment
-    jmp matmul                ; matmul reads DS:SI from weight row 0
-
 zero_si_zero_di_ret:
     xor si, si
     xor di, di
@@ -486,6 +485,10 @@ get_pos_count:
     mov cx, [es:CUR_POS]
     inc cx
     ret
+
+set_ds_token_emb_tail:
+    mov ds, ax
+    jmp zero_si_zero_di_ret
 
 call_set_seg_1024_jmp_get_kv_offset:
     call set_seg_1024
@@ -552,8 +555,7 @@ quant_cache:
 set_ds_token_emb:
     imul ax, bx, 16
     add ax, W_TOKEN_EMB
-    mov ds, ax
-    jmp zero_si_zero_di_ret
+    jmp set_ds_token_emb_tail
 
 ; Full forward pass of the transformer for one token.
 ; in BX:  input token index
