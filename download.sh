@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -e
 
 MODELS_DIR="$(dirname "$0")/models"
