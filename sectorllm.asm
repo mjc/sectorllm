@@ -415,9 +415,8 @@ quant_kv_cache:
     mov ax, VC_SEG
  .quant:
     push ax
-    xchg ax, dx
-    add dh, 0x14
-    push dx
+    add ah, 0x14
+    push ax
     mov cl, KV_DIM
     push si
     xor ebx, ebx
