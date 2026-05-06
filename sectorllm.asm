@@ -158,12 +158,10 @@ start_inference:
 .gen_loop:
     call forward
     cmp bx, 2                   ; check for BOS or EOS
-    jbe .halt
+    jbe $
     call print_token
     inc word [es:CUR_POS]
     jmp .gen_loop
-.halt:
-    jmp $
 
 
 ; Inverse square root approximation
@@ -453,13 +451,13 @@ get_pos_count:
     inc cx
     ret
 
-add_si_cx_ret:
-    add si, cx
-    ret
-
 set_vs_seg:
     mov dh, VS_SEG >> 8
     jmp short set_seg_128
+
+set_vc_seg:
+    mov dx, VC_SEG
+    jmp short set_seg_1024
 
 set_ks_seg:
     mov dx, KS_SEG
@@ -505,7 +503,8 @@ get_att_ptr:
     imul si, bp, 2048	   ; h * 2048 (SEG * 4 bytes)
     add si, R_ATT          ; SI = base of this head's attention scores
     imul cx, di, 4         ; cx = t * 4 (4 bytes per score)
-    jmp short add_si_cx_ret ; SI = &R_ATT[h][t]
+    add si, cx             ; SI = &R_ATT[h][t]
+    ret
 
 ; matmul helper: 
 ; in AX:   base_Q
@@ -860,8 +859,7 @@ attention:
     push cx
 
     ; Load V vector for token t, KV head kvh = h/2
-    mov dx, VC_SEG
-    call set_seg_1024           ; DS =  V cache for this layer
+    call set_vc_seg             ; DS =  V cache for this layer
     call get_kv_offset          ; BX = offset of V[t][kvh]
 
     ; a_t = R_ATT[h][t]
