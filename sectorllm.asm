@@ -411,12 +411,12 @@ set_seg_128:
 
 quant_kv_cache:
     mov ax, KC_SEG
-    mov dx, KS_SEG
     call .quant
     mov ax, VC_SEG
-    mov dx, VS_SEG
  .quant:
     push ax
+    xchg ax, dx
+    add dh, 0x14
     push dx
     mov cl, KV_DIM
     push si
