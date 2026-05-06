@@ -547,14 +547,18 @@ quant_cache:
     inc bx
     jmp quant_cache_q_lp_tail
 
+set_ds_token_emb:
+    imul ax, bx, 16
+    add ax, W_TOKEN_EMB
+    mov ds, ax
+    ret
+
 ; Full forward pass of the transformer for one token.
 ; in BX:  input token index
 ; out BX: predicted token
 forward:
     ; Load token embedding into R_X
-    imul ax, bx, 16             ; token * DIM * 4
-    add ax, W_TOKEN_EMB         ; ax = segment of this token's embedding
-    mov ds, ax
+    call set_ds_token_emb
     xor si, si
     xor di, di                  ; DI = R_X
     mov cl, DIM * 2             ; dword
@@ -659,9 +663,7 @@ forward:
 ; the token embedding table the logit for token i is just the
 ; dot product of the final hidden state with embedding[i].
 .lm_loop:
-    imul ax, bx, 16             ; token i * 16 paragraphs
-    add ax, W_TOKEN_EMB
-    mov ds, ax                  ; DS = embedding[i] segment
+    call set_ds_token_emb
 
     xor ebp, ebp                ; ebp dot accumulator
     xor si, si                  ; embedding row offset
