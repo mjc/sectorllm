@@ -481,6 +481,9 @@ do_matmul:
     xor si, si
     jmp matmul                ; matmul reads DS:SI from weight row 0
 
+zero_si_zero_di_jmp_get_pos_count:
+    xor si, si
+
 zero_di_jmp_get_pos_count:
     xor di, di
 get_pos_count:
@@ -558,8 +561,7 @@ set_ds_token_emb:
     imul ax, bx, 16
     add ax, W_TOKEN_EMB
     mov ds, ax
-    xor si, si
-    jmp zero_di_jmp_get_pos_count
+    jmp zero_si_zero_di_jmp_get_pos_count
 
 ; Full forward pass of the transformer for one token.
 ; in BX:  input token index
