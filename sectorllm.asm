@@ -860,8 +860,8 @@ silu_gate:
     ; Compute silu_lut index from gate[i]
     mov eax, [es:di]            ; eax = gate[i] (FP16.16)
     sar eax, 8                  ; byte offset into silu_lut
-    and ax, 0xFFFC
-    add ax, 0x1000
+    and al, 0xFC
+    add ah, 0x10
     xchg ax, bx                 ; bx = silu_lut byte offset
 
     ; Multiply by up[i] and store in gate[i]
