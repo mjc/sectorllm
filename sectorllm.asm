@@ -799,8 +799,8 @@ attention:
     imul di, bp, 32             ; h * 32
     add di, R_XB
     xor eax, eax
-    mov cl, HEAD_DIM
-    rep stosd                   ; zero out R_XB[h]
+    mov cl, HEAD_DIM * 2
+    rep stosw                   ; zero out R_XB[h]
 
     call zero_di_jmp_get_pos_count ; DI = t
 .v_loop:
