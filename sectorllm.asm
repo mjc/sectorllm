@@ -859,15 +859,14 @@ silu_gate:
 .lp:
     ; Compute silu_lut index from gate[i]
     mov eax, [es:di]            ; eax = gate[i] (FP16.16)
-    sar eax, 10                 ; downscale to [-512, 511] 
-    add ah, 2                   ; ax += 512, shift to [0, 1023]
-
-    shl ax, 2
-    xchg ax, bx                 ; bx = index * 4
+    sar eax, 8                  ; byte offset into silu_lut
+    and ax, 0xFFFC
+    add ax, 0x1000
+    xchg ax, bx                 ; bx = silu_lut byte offset
 
     ; Multiply by up[i] and store in gate[i]
     es lodsd                    ; eax = up[i]
-    imul dword [fs:bx+0x800]    ; eax = up[i] * silu(gate[i])
+    imul dword [fs:bx]          ; eax = up[i] * silu(gate[i])
     call q16_shift              ; shift back to FP16.16
     stosd                       ; gate[i] = res, DI += 4
     loop .lp
