@@ -489,9 +489,9 @@ get_pos_count:
     inc cx
     ret
 
-zero_di_jmp_rmsnorm:
-    xor di, di
-    jmp do_rmsnorm
+lm_best_tail:
+    mov bx, [es:R_BEST]
+    ret
 
 inc_bx_q_lp_tail:
     inc bx
@@ -635,7 +635,8 @@ forward:
 
     ; Final normalization
     mov ax, W_RMS_FINAL - LAYERS * 16
-    call zero_di_jmp_rmsnorm    ; R_X = rmsnorm(R_X, w_rms_final)
+    xor di, di
+    call do_rmsnorm             ; R_X = rmsnorm(R_X, w_rms_final)
 
     ; Compute logits and pick best token (use greedy argmax)
     xor bx, bx                       ; BX = token index
@@ -670,8 +671,7 @@ forward:
     test bh, VOCAB >> 8
     jz .lm_loop                 ; next token
 
-    mov bx, [es:R_BEST]         ; return best in BX
-    ret
+    jmp lm_best_tail
 
 ; Compute multi-head grouped-query attention for the current position.
 ; Reads Q from R_QKV, K/V from the quantized KV cache.
