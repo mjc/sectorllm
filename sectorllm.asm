@@ -451,6 +451,8 @@ quant_kv_cache:
 ; in DI:   t (token position)
 ; in BP:   h (attention head index)
 ; out BX:  t * KV_DIM + kvh * HEAD_DIM
+call_set_seg_1024_jmp_get_kv_offset:
+    call set_seg_1024
 get_kv_offset:
     imul bx, di, 32 ; bx = t * 32 (KV_DIM bytes per token)
     imul cx, bp, 4
@@ -497,10 +499,6 @@ inc_bx_q_lp_tail:
 quant_cache_q_lp_tail:
     loop quant_cache.q_lp
     ret
-
-call_set_seg_1024_jmp_get_kv_offset:
-    call set_seg_1024
-    jmp get_kv_offset
 
 _bootsector_end:
 %assign bootsector_size _bootsector_end - $$
