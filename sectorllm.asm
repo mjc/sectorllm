@@ -798,7 +798,7 @@ attention:
     ; Clear r_xb[h] before accumulating
     imul di, bp, 32             ; h * 32
     add di, R_XB
-    xor eax, eax
+    xor ax, ax
     mov cl, HEAD_DIM * 2
     rep stosw                   ; zero out R_XB[h]
 
