@@ -1,7 +1,7 @@
 # sectorllm
 >  The world's smallest llama2 inference engine
 
-A complete Llama2 inference engine that fits in 1277 bytes of x86 real mode assembly. 
+A complete Llama2 inference engine that fits in 1189 bytes of x86 real mode assembly. 
 It boots directly from disk, loads a quantized model, and generates text before any operating system loads.
 
 ![image](image.png)
@@ -10,8 +10,35 @@ It can run the [stories260K](https://huggingface.co/karpathy/tinyllamas/blob/mai
 
 ## Running
 ```
-./download.sh && python3 quantize.py && make run
+make run
 ```
+
+## Testing
+```
+make test
+```
+
+The Makefile downloads and quantizes the model as needed before building
+`boot.img`.
+
+To include a short QEMU boot smoke test:
+```
+RUN_QEMU_SMOKE=1 make test
+```
+
+To capture VGA text memory and compare the generated text:
+```
+make final-text
+```
+
+The screenshot and smoke-test Make targets use `QEMU_ACCEL=kvm:tcg` by default,
+so QEMU uses KVM when available and falls back to TCG otherwise. Override this
+with `QEMU_ACCEL`, for example:
+```
+make SHORT=1 QEMU_ACCEL=tcg screenshot
+make QEMU_ACCEL=kvm:tcg screenshot
+```
+
 
 ## How it works
 The boot sector loads the model data from disk into high memory, then runs a full transformer forward pass for each token.
