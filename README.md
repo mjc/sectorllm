@@ -26,7 +26,7 @@ To include a short QEMU boot smoke test:
 RUN_QEMU_SMOKE=1 make test
 ```
 
-To capture VGA text memory and check the exact generated text:
+To capture VGA text memory and compare the generated text:
 ```
 make final-text
 ```
