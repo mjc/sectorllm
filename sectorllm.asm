@@ -664,8 +664,12 @@ forward:
     cmp ebp, [es:R_MAX]
     jle .skip_max
 .set_max:
-    mov [es:R_MAX], ebp         ; new best score
-    mov [es:R_BEST], bx         ; new best token
+    mov di, R_MAX               ; store new best score/token
+    xchg eax, ebp
+    stosd
+    xchg ax, bx
+    stosw
+    xchg ax, bx
 .skip_max:
     inc bx
     test bh, VOCAB >> 8
