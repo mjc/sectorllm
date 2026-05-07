@@ -314,6 +314,14 @@ matmul:
 
     ret
 
+; Add the matmul output into R_X in-place
+; in ES:BX: matmul output
+; Convenience wrapper around vadd for post-matmul accumulation (saves bytes)
+vadd_rx:
+    dec bh                      ; matmul leaves BX one DIM vector past output
+    xchg si, bx                 ; grab pointer from matmul
+    xor di, di                  ; R_X
+
 ; Vector addition: ES:DI += ES:SI for DIM FP16.16 elements
 ; in ES:SI: src vector (FP16.16[DIM])
 ; in ES:DI: dest vector (FP16.16[DIM])
@@ -467,15 +475,8 @@ q16_shift:
     shrd eax, edx, 16
     ret
 
-; Add the matmul output into R_X in-place
-; in ES:BX: matmul output
-; Convenience wrapper around vadd for post-matmul accumulation (saves bytes)
-vadd_rx:
-    dec bh                      ; matmul leaves BX one DIM vector past output
-    xchg si, bx                 ; grab pointer from matmul
-    xor di, di                  ; R_X
-    jmp vadd
-
+set_ds_token_emb_tail:
+    mov ds, ax
 zero_si_zero_di_jmp_get_pos_count:
     xor si, si
 
@@ -486,16 +487,16 @@ get_pos_count:
     inc cx
     ret
 
+zero_di_jmp_rmsnorm:
+    xor di, di
+    jmp do_rmsnorm
+
 inc_bx_q_lp_tail:
     inc bx
 
 quant_cache_q_lp_tail:
     loop quant_cache.q_lp
     ret
-
-set_ds_token_emb_tail:
-    mov ds, ax
-    jmp zero_si_zero_di_jmp_get_pos_count
 
 call_set_seg_1024_jmp_get_kv_offset:
     call set_seg_1024
@@ -636,8 +637,7 @@ forward:
 
     ; Final normalization
     mov ax, W_RMS_FINAL - LAYERS * 16
-    xor di, di                  ; R_X
-    call do_rmsnorm             ; R_X = rmsnorm(R_X, w_rms_final)
+    call zero_di_jmp_rmsnorm    ; R_X = rmsnorm(R_X, w_rms_final)
 
     ; Compute logits and pick best token (use greedy argmax)
     xor bx, bx                       ; BX = token index
