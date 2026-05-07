@@ -10,7 +10,7 @@ It can run the [stories260K](https://huggingface.co/karpathy/tinyllamas/blob/mai
 
 ## Running
 ```
-./download.sh && python3 quantize.py && make run
+make run
 ```
 
 ## Testing
@@ -18,27 +18,25 @@ It can run the [stories260K](https://huggingface.co/karpathy/tinyllamas/blob/mai
 make test
 ```
 
-The default harness assembles `sectorllm.asm`, checks the boot signature, and
-enforces the boot-sector and full-code size limits. If
-`models/stories260K_int.bin` exists, it also builds `boot.img`, verifies that
-the image starts with the assembled code, polls QEMU until generation stops,
-prints the generated final story, and exits nonzero unless it exactly matches
-the expected text.
+The Makefile downloads and quantizes the model as needed before building
+`boot.img`.
 
 To include a short QEMU boot smoke test:
 ```
 RUN_QEMU_SMOKE=1 make test
 ```
 
-To assert the final generated display text, poll QEMU until generation stops,
-then capture VGA text memory and check for `Thank you, mommy!`:
+To capture VGA text memory and check the exact generated text:
 ```
 make final-text
 ```
 
-For fixed timestamp checks, for example 75 and 80 seconds:
+The screenshot and smoke-test Make targets use `QEMU_ACCEL=kvm:tcg` by default,
+so QEMU uses KVM when available and falls back to TCG otherwise. Override this
+with `QEMU_ACCEL`, for example:
 ```
-QEMU_FINAL_CHECKS=75,80 make final-text
+make SHORT=1 QEMU_ACCEL=tcg screenshot
+make QEMU_ACCEL=kvm:tcg screenshot
 ```
 
 
