@@ -96,8 +96,8 @@ org 0x7c00
 %define R_XB2     0x0300    ; FP16.16[DIM], overlaps dead K/V tail of R_QKV
 
 ; Global State Variables
-%define R_MAX     0x07E0    ; dword
-%define R_BEST    0x07E4    ; word
+%define R_MAX     0x0100    ; dword, overlaps dead R_XB during logits
+%define R_BEST    0x0104    ; word
 %define CUR_LAYER 0x07E6    ; word
 %define CUR_POS   0x07E8    ; word
 
@@ -665,7 +665,7 @@ forward:
 ; argmax, just track the highest scoring token
     test bx, bx
     jz .set_max                 ; token 0 seeds the max for this pass
-    cmp ebp, [es:R_MAX]
+    cmp ebp, [es:di + R_MAX - DIM*4]
     jle .skip_max
 .set_max:
     mov di, R_MAX               ; store new best score/token
