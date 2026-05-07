@@ -583,18 +583,11 @@ forward:
 
     ; Apply RoPE to Q and K
     mov di, R_QKV
-    mov cl, HEADS
-    call apply_rope             ; rotate Q
-
-
-    push di                     ; K start
-    mov cl, KV_HEADS
-    call apply_rope             ; rotate K
-
-
+    mov cl, HEADS + KV_HEADS
+    call apply_rope             ; rotate Q and K
 
     ; Quantize and cache K and V for this position
-    pop si
+    mov si, R_QKV + DIM*4
     call quant_kv_cache         ; KC/VC[layer][pos] = quantize(K/V)
 
 
@@ -749,10 +742,11 @@ attention:
     ; 2. Softmax over attention scores
     ; Converts raw R_ATT[h][0..pos] to probabilities
 .softmax:
+    push di
     xor di, di
     call get_att_ptr            ; SI = &R_ATT[h][0]
     mov di, si
-    call get_pos_count
+    pop cx
 
     ; Find max score
     push di
