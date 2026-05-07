@@ -199,6 +199,8 @@ inv_sqrt:
 ; rmsnorm helper: sets up DS and BX before doing rmsnorm logic
 ; in AX:      weight segment base
 ; in ES:DI:   output buffer
+zero_di_do_rmsnorm:
+        xor di, di
 do_rmsnorm:
         imul cx, word [es:CUR_LAYER], 16
         add ax, cx
@@ -422,7 +424,6 @@ set_seg_1024:
 set_seg_128:
     mov cl, 7
 .do_seg:
-    xor ch, ch
     push ax
     mov ax, [es:CUR_LAYER]
     shl ax, cl                  ; ax = CUR_LAYER * stride
@@ -639,8 +640,7 @@ forward:
 
     ; Final normalization
     mov ax, W_RMS_FINAL - LAYERS * 16
-    xor di, di
-    call do_rmsnorm             ; R_X = rmsnorm(R_X, w_rms_final)
+    call zero_di_do_rmsnorm     ; R_X = rmsnorm(R_X, w_rms_final)
 
     ; Compute logits and pick best token (use greedy argmax)
     xor bx, bx                       ; BX = token index
@@ -833,7 +833,7 @@ attention:
     imul si, bp, 32             ; h * 32
     add si, R_XB                ; SI = &R_XB[h]
 
-    mov cl, HEAD_DIM
+    mov cx, HEAD_DIM
 .v_mac:
     movsx eax, byte [bx]        ; eax = V[t][i] (int8)
     inc bx
