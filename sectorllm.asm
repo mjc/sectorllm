@@ -123,7 +123,7 @@ org 0x7c00
 ; It also contains the main inference loop and utility subroutines.
 entry:
     ; Set up segments
-    mov sp, 0x7BF0
+    xchg sp, ax
 
     ; Load stage2
     mov bh, 0x7E
