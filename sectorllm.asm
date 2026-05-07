@@ -130,11 +130,11 @@ entry:
     mov ax, 0x0202              ; AH=02 read, AL=2 sectors
     mov cl, 2                   ; assume CH=0, sector 2
     int 0x13
-    push 0x2000                 ; LUT segment
-    pop fs
+    mov ax, 0x2000              ; LUT segment
+    mov fs, ax
     ; Build the DAP on the stack using zero registers that survive the CHS read.
     push 3
-    push fs
+    push ax
     push es
     push 64
     push 0x10
