@@ -598,7 +598,7 @@ forward:
     mov ch, 1
     mov edx, (DIM << 16) | DIM
     mov di, R_XB
-    mov bx, R_XB2
+    mov bh, R_XB2 >> 8
     call do_matmul              ; R_XB2 = w_wo * R_XB
 
     ; Residual connection
