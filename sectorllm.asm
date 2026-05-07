@@ -368,22 +368,18 @@ apply_rope:
     call q16_shift
     pop edx                     ; edx = x1*sin
     sub eax, edx                ; new_x0 = (x0*cos)-(x1*sin)
-    push eax                    ; stack = new_x0
+    xchg [es:di], eax           ; store new_x0, recover old x0
+    imul esi                    ; x0*sin
+    call q16_shift
+    push eax                    ; stack = x0*sin
 
     mov eax, [es:di+4]          ; x1
     imul ebp                    ; x1*cos
     call q16_shift
-    push eax                    ; stack = x1*cos, new_x0
-
-    mov eax, [es:di]            ; x0
-    imul esi                    ; x0*sin
-    call q16_shift
-    pop edx                     ; edx = x1*cos
+    pop edx                     ; edx = x0*sin
     add eax, edx                ; eax = x0*sin+x1*cos
 
     mov [es:di+4], eax          ; store new_x1
-    pop eax                     ; eax = new_x0
-    mov [es:di], eax            ; store new_x0
 
     add bx, 8                   ; advance to next (cos, sin) pair
     add di, 8                   ; advance to next (x0, x1) pair
@@ -501,6 +497,11 @@ quant_cache_q_lp_tail:
     loop quant_cache.q_lp
     ret
 
+set_ds_token_emb:
+    imul ax, bx, 16
+    add ax, W_TOKEN_EMB
+    jmp set_ds_token_emb_tail
+
 _bootsector_end:
 %assign bootsector_size _bootsector_end - $$
 %warning boot sector is bootsector_size bytes.
@@ -550,11 +551,6 @@ quant_cache:
     idiv ebp                    ; eax = round(x/scale), clamped to int8
     mov [bx], al                ; store quantized byte
     jmp inc_bx_q_lp_tail
-
-set_ds_token_emb:
-    imul ax, bx, 16
-    add ax, W_TOKEN_EMB
-    jmp set_ds_token_emb_tail
 
 ; Full forward pass of the transformer for one token.
 ; in BX:  input token index
