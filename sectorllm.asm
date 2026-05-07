@@ -425,6 +425,7 @@ set_seg_1024:
 set_seg_128:
     mov cl, 7
 .do_seg:
+    xor ch, ch
     push ax
     mov ax, [es:CUR_LAYER]
     shl ax, cl                  ; ax = CUR_LAYER * stride
@@ -830,7 +831,7 @@ attention:
     imul si, bp, 32             ; h * 32
     add si, R_XB                ; SI = &R_XB[h]
 
-    mov cx, HEAD_DIM
+    mov cl, HEAD_DIM
 .v_mac:
     movsx eax, byte [bx]        ; eax = V[t][i] (int8)
     inc bx
