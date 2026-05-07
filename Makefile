@@ -1,7 +1,10 @@
-.PHONY: all run screenshot test clean download quantize size listing dump-boot smoke final-text
+.PHONY: all run screenshot test clean download quantize size listing dump-boot smoke final-text check-qemu
 
 QEMU_ACCEL ?= kvm:tcg
 QEMU_ACCEL_ARG := $(if $(QEMU_ACCEL),-machine accel=$(QEMU_ACCEL))
+QEMU := qemu-system-i386 $(QEMU_ACCEL_ARG) -drive file=boot.img,format=raw
+QEMU_MONITOR := $(QEMU) -display none -monitor stdio -serial none
+REQ := command -v
 QEMU_TIMEOUT ?= 5
 QEMU_DONE_POLL_INTERVAL ?= 1
 QEMU_DONE_STABLE_SECONDS ?= 20
@@ -20,6 +23,10 @@ SCREENSHOT_PPM := $(if $(QEMU_SCREENSHOT),$(QEMU_SCREENSHOT),$(if $(filter 1,$(S
 SCREENSHOT_DELAY := $(if $(QEMU_SCREENSHOT_DELAY),$(QEMU_SCREENSHOT_DELAY),$(if $(filter 1,$(SHORT)),5,300))
 FINAL_TEXT_BIN := artifacts/qemu-vga-final.bin
 FINAL_TEXT_TXT := artifacts/qemu-vga-final.txt
+FINAL_TEXT_LOG := artifacts/qemu-final-text.log
+FINAL_TEXT_FIFO := artifacts/qemu-final-text.in
+SMOKE_LOG := artifacts/qemu-smoke.log
+SCREENSHOT_LOG := artifacts/qemu-screen.log
 NASM_SIZE_LOG ?= artifacts/nasm-size.log
 LISTING ?= artifacts/sectorllm.lst
 
@@ -44,14 +51,10 @@ boot.img: boot.bin models/stories260K_int.bin quantize.py
 
 size:
 	@mkdir -p artifacts
-	@tmp="$$(mktemp)"; \
-	log="$(NASM_SIZE_LOG)"; \
-	nasm -f bin sectorllm.asm -o "$$tmp" 2>"$$log"; \
-	cat "$$log"; \
-	image_size="$$(wc -c < "$$tmp")"; \
-	signature="$$(od -An -tx1 -j 510 -N 2 "$$tmp" | tr -d '[:space:]')"; \
-	boot_size="$$(sed -n 's/.*boot sector is \([0-9][0-9]*\) bytes.*/\1/p' "$$log")"; \
-	code_size="$$(sed -n 's/.*The total code is \([0-9][0-9]*\) bytes.*/\1/p' "$$log")"; \
+	@tmp="$$(mktemp)"; log="$(NASM_SIZE_LOG)"; \
+	nasm -f bin sectorllm.asm -o "$$tmp" 2>"$$log"; cat "$$log"; \
+	image_size="$$(wc -c <"$$tmp")"; signature="$$(od -An -tx1 -j 510 -N 2 "$$tmp" | tr -d '[:space:]')"; \
+	boot_size="$$(sed -n 's/.*boot sector is \([0-9][0-9]*\) bytes.*/\1/p' "$$log")"; code_size="$$(sed -n 's/.*The total code is \([0-9][0-9]*\) bytes.*/\1/p' "$$log")"; \
 	rm -f "$$tmp"; \
 	if [ "$$image_size" != 1536 ]; then echo "FAIL: assembled binary is $$image_size bytes, expected 1536" >&2; exit 1; fi; \
 	if [ "$$signature" != 55aa ]; then echo "FAIL: boot signature is not 55 aa at offset 510" >&2; exit 1; fi; \
@@ -70,6 +73,10 @@ dump-boot: boot.bin
 smoke:
 	$(MAKE) RUN_QEMU_SMOKE=1 test
 
+check-qemu:
+	@$(REQ) qemu-system-i386 >/dev/null 2>&1 || { echo "missing required command: qemu-system-i386" >&2; exit 127; }
+	@$(REQ) timeout >/dev/null 2>&1 || { echo "missing required command: timeout" >&2; exit 127; }
+
 final-text: $(FINAL_TEXT_TXT)
 	@story="$$(sed -n '/Booting from Hard Disk/,$$p' "$(FINAL_TEXT_TXT)" | sed '1s/.*Booting from Hard Disk...//' | tr -d '\n' | sed 's/[[:space:]]*$$//')"; \
 	text="$$(tr '\n' ' ' < "$(FINAL_TEXT_TXT)")"; \
@@ -78,22 +85,18 @@ final-text: $(FINAL_TEXT_TXT)
 	if [ "$$story" != "$$QEMU_EXPECT_GENERATED_TEXT" ]; then echo "FAIL: generated text did not exactly match expected text" >&2; exit 1; fi
 	@echo "OK: final generated text exactly matches expected text"
 
-$(FINAL_TEXT_TXT): boot.img Makefile
-	@command -v qemu-system-i386 >/dev/null 2>&1 || { echo "missing required command: qemu-system-i386" >&2; exit 127; }
-	@command -v timeout >/dev/null 2>&1 || { echo "missing required command: timeout" >&2; exit 127; }
+$(FINAL_TEXT_TXT): boot.img Makefile | check-qemu
 	@[ -n "$(QEMU_CUR_POS_PHYS)" ] || { echo "could not derive CUR_POS address from sectorllm.asm" >&2; exit 1; }
 	@mkdir -p artifacts
 	@set -e; \
-	log=artifacts/qemu-final-text.log; \
-	fifo=artifacts/qemu-final-text.in; \
+	log="$(FINAL_TEXT_LOG)"; fifo="$(FINAL_TEXT_FIFO)"; \
 	rm -f "$(FINAL_TEXT_BIN)" "$(FINAL_TEXT_TXT)" "$$fifo"; \
 	mkfifo "$$fifo"; \
 	qemu_pid=; \
 	cleanup() { status=$$?; if [ -n "$$qemu_pid" ]; then printf 'quit\n' >&3 2>/dev/null || true; exec 3>&- 2>/dev/null || true; wait "$$qemu_pid" 2>/dev/null || true; else exec 3>&- 2>/dev/null || true; fi; rm -f "$$fifo"; exit "$$status"; }; \
 	trap cleanup EXIT INT TERM; \
 	exec 3<>"$$fifo"; \
-	timeout "$$(( $(QEMU_DONE_TIMEOUT) + 30 ))" qemu-system-i386 $(QEMU_ACCEL_ARG) \
-		-drive file=boot.img,format=raw -display none -monitor stdio -serial none <"$$fifo" >"$$log" 2>&1 & \
+	timeout "$$(( $(QEMU_DONE_TIMEOUT) + 30 ))" $(QEMU_MONITOR) <"$$fifo" >"$$log" 2>&1 & \
 	qemu_pid=$$!; \
 	start=$$(date +%s); \
 	last_change=$$start; \
@@ -146,39 +149,31 @@ $(FINAL_TEXT_TXT): boot.img Makefile
 	@echo "OK: captured final VGA text after generation stopped"
 
 run: boot.img
-	qemu-system-i386 $(QEMU_ACCEL_ARG) -hda boot.img
+	$(QEMU)
 
 screenshot: $(SCREENSHOT_PPM)
 
-$(SCREENSHOT_PPM): boot.img
-	@command -v qemu-system-i386 >/dev/null 2>&1 || { echo "missing required command: qemu-system-i386" >&2; exit 127; }
-	@command -v timeout >/dev/null 2>&1 || { echo "missing required command: timeout" >&2; exit 127; }
+$(SCREENSHOT_PPM): boot.img | check-qemu
 	@mkdir -p "$(@D)" artifacts
 	@png="$(patsubst %.ppm,%.png,$@)"; \
-	log=artifacts/qemu-screen.log; \
+	log="$(SCREENSHOT_LOG)"; \
 	rm -f "$@" "$$png"; \
 	( sleep "$(SCREENSHOT_DELAY)"; printf 'screendump %s\nquit\n' "$@" ) | \
-		timeout "$$(( $(SCREENSHOT_DELAY) + 10 ))" qemu-system-i386 $(QEMU_ACCEL_ARG) \
-			-drive file=boot.img,format=raw -display none -monitor stdio -serial none >"$$log" 2>&1; \
+		timeout "$$(( $(SCREENSHOT_DELAY) + 10 ))" $(QEMU_MONITOR) >"$$log" 2>&1; \
 	if [ ! -s "$@" ]; then echo "FAIL: QEMU did not write $@; monitor log follows:" >&2; cat "$$log" >&2; exit 1; fi; \
-	echo "OK: captured after $(SCREENSHOT_DELAY)s"; \
-	echo "OK: qemu cpu accel=$(or $(QEMU_ACCEL),default)"; \
 	echo "OK: wrote $@"; \
-	if command -v magick >/dev/null 2>&1; then magick "$@" "$$png"; echo "OK: wrote $$png"; else echo "SKIP: ImageMagick not installed; leaving PPM only"; fi
+	if $(REQ) magick >/dev/null 2>&1; then magick "$@" "$$png"; echo "OK: wrote $$png"; else echo "SKIP: ImageMagick not installed; leaving PPM only"; fi
 
 test: size boot.img
 	@echo "OK: built boot.img"
 	@if [ "$(RUN_FINAL_TEXT)" = 1 ]; then $(MAKE) final-text; fi
 	@if [ "$(RUN_QEMU_SMOKE)" = 1 ]; then \
-		command -v qemu-system-i386 >/dev/null 2>&1 || { echo "missing required command: qemu-system-i386" >&2; exit 127; }; \
-		command -v timeout >/dev/null 2>&1 || { echo "missing required command: timeout" >&2; exit 127; }; \
+		$(MAKE) check-qemu || exit $$?; \
 		mkdir -p artifacts; \
 		status=0; \
-		timeout "$(QEMU_TIMEOUT)" qemu-system-i386 $(QEMU_ACCEL_ARG) \
-			-drive file=boot.img,format=raw -display none -monitor none -serial none -no-reboot >artifacts/qemu-smoke.log 2>&1 || status=$$?; \
-		if [ "$$status" != 0 ] && [ "$$status" != 124 ]; then echo "FAIL: qemu exited with status $$status; log: artifacts/qemu-smoke.log" >&2; exit "$$status"; fi; \
+		timeout "$(QEMU_TIMEOUT)" $(QEMU) -display none -monitor none -serial none -no-reboot >"$(SMOKE_LOG)" 2>&1 || status=$$?; \
+		if [ "$$status" != 0 ] && [ "$$status" != 124 ]; then echo "FAIL: qemu exited with status $$status; log: $(SMOKE_LOG)" >&2; exit "$$status"; fi; \
 		echo "OK: qemu smoke ran for $(QEMU_TIMEOUT)s"; \
-		echo "OK: qemu cpu accel=$(or $(QEMU_ACCEL),default)"; \
 	fi
 clean:
 	rm -rf boot.img boot.bin artifacts \
