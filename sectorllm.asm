@@ -500,6 +500,9 @@ quant_cache_q_lp_tail:
     loop quant_cache.q_lp
     ret
 
+silu_gate_loop_tail:
+    loop silu_gate.lp
+
 silu_gate_tail:
     xchg di, bx
     pop di
@@ -521,6 +524,28 @@ dw 0xAA55
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Sector 1 and 2                                                             ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; SiLU gating: out[i] = silu(gate[i]) * up[i]
+; where silu(x) = x * sigmoid(x), looked up from a precomputed table
+silu_gate:
+    mov di, R_HB                ; DI = gate vector
+    push di
+    mov si, R_HB+HIDDEN*4       ; SI = up vector
+    mov cl, HIDDEN
+.lp:
+    ; Compute silu_lut index from gate[i]
+    mov eax, [es:di]            ; eax = gate[i] (FP16.16)
+    sar eax, 8                  ; byte offset into silu_lut
+    and al, 0xFC
+    add ah, 0x10
+    xchg ax, bx                 ; bx = silu_lut byte offset
+
+    ; Multiply by up[i] and store in gate[i]
+    es lodsd                    ; eax = up[i]
+    imul dword [fs:bx]          ; eax = up[i] * silu(gate[i])
+    call q16_shift              ; shift back to FP16.16
+    stosd                       ; gate[i] = res, DI += 4
+    jmp silu_gate_loop_tail
 
 quant_cache:
     ; Find max absolute value
@@ -848,29 +873,6 @@ attention:
     jns .head_loop
 .done:
     ret
-
-; SiLU gating: out[i] = silu(gate[i]) * up[i]
-; where silu(x) = x * sigmoid(x), looked up from a precomputed table
-silu_gate:
-    mov di, R_HB                ; DI = gate vector
-    push di
-    mov si, R_HB+HIDDEN*4       ; SI = up vector
-    mov cl, HIDDEN
-.lp:
-    ; Compute silu_lut index from gate[i]
-    mov eax, [es:di]            ; eax = gate[i] (FP16.16)
-    sar eax, 8                  ; byte offset into silu_lut
-    and al, 0xFC
-    add ah, 0x10
-    xchg ax, bx                 ; bx = silu_lut byte offset
-
-    ; Multiply by up[i] and store in gate[i]
-    es lodsd                    ; eax = up[i]
-    imul dword [fs:bx]          ; eax = up[i] * silu(gate[i])
-    call q16_shift              ; shift back to FP16.16
-    stosd                       ; gate[i] = res, DI += 4
-    loop .lp
-    jmp silu_gate_tail
 
 _code_end:
 %assign code_size _code_end - $$
