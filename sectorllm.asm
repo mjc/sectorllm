@@ -836,7 +836,7 @@ attention:
     inc bx
     imul eax, edx               ; eax = V[t][i] * a_scaled
     add [es:si], eax
-    add si, 4
+    lodsd                       ; SI += 4, value is dead
     loop .v_mac
 
     inc di                      ; t++
