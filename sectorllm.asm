@@ -765,7 +765,7 @@ attention:
     ; Compute exp(x - max) for each score and accumulate sum
     push di
     push cx
-    xor esi, esi                ; sum = 0
+    xor si, si                  ; sum = 0
 .s_exp:
     push eax                    ; save max
     sub eax, [es:di]            ; diff = max - x
