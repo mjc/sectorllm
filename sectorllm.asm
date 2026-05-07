@@ -663,8 +663,6 @@ forward:
     loop .dot
 
 ; argmax, just track the highest scoring token
-    test bx, bx
-    jz .set_max                 ; token 0 seeds the max for this pass
     cmp ebp, [es:di + R_MAX - DIM*4]
     jle .skip_max
 .set_max:
