@@ -668,7 +668,6 @@ forward:
     cmp ebp, [es:di + R_MAX - DIM*4]
     jle .skip_max
 .set_max:
-    mov di, R_MAX               ; store new best score/token
     xchg eax, ebp
     stosd
     xchg ax, bx
