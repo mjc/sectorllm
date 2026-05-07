@@ -96,12 +96,12 @@ org 0x7c00
 %define R_XB2     0x0300    ; FP16.16[DIM], overlaps dead K/V tail of R_QKV
 
 ; Global State Variables
-%define R_MAX     0x09E0    ; dword
-%define R_BEST    0x09E4    ; word
-%define CUR_LAYER 0x09E6    ; word
-%define CUR_POS   0x09E8    ; word
+%define R_MAX     0x07E0    ; dword
+%define R_BEST    0x07E4    ; word
+%define CUR_LAYER 0x07E6    ; word
+%define CUR_POS   0x07E8    ; word
 
-%define R_ATT     0x0A00    ; FP16.16[TOKEN_COUNT*HEADS]
+%define R_ATT     0x0800    ; FP16.16[TOKEN_COUNT*HEADS]
     
 
 ; Cache Segments
@@ -340,26 +340,28 @@ vadd:
 ; in ES:DI: vector to rotate (FP16.16), modified in place
 ; in CX:     number of heads to process
 apply_rope:
-    imul bx, [es:CUR_POS], 32   ; bx = CUR_POS * 32 (8 bytes per pair * 4 pairs per head)
+    imul si, [es:CUR_POS], 32   ; si = CUR_POS * 32 (8 bytes per pair * 4 pairs per head)
     push W_FREQ_CIS
     pop ds                      ; DS = freq table
 
 
 .head_loop:
-    push bx                     ; save freq table offset
+    push si                     ; save freq table offset
     push cx                     ; save head counter
     mov cl, 4                   ; 4 pairs per head
 
 .pair_loop:
     ; Load sin and cos values
-    mov ebp, [bx]               ; ebp = cos
-    mov esi, [bx+4]             ; esi = sin
+    lodsd                       ; eax = cos, SI += 4
+    xchg eax, ebp               ; ebp = cos
+    lodsd                       ; eax = sin, SI += 4
+    xchg eax, ebx               ; ebx = sin
 
     ; Rotate (x0, x1):
     ;   new_x0 = x0*cos - x1*sin
     ;   new_x1 = x0*sin + x1*cos
     mov eax, [es:di+4]          ; x1
-    imul esi                    ; x1*sin
+    imul ebx                    ; x1*sin
     call q16_shift
     push eax                    ; stack = x1*sin
 
@@ -369,7 +371,7 @@ apply_rope:
     pop edx                     ; edx = x1*sin
     sub eax, edx                ; new_x0 = (x0*cos)-(x1*sin)
     xchg [es:di], eax           ; store new_x0, recover old x0
-    imul esi                    ; x0*sin
+    imul ebx                    ; x0*sin
     call q16_shift
     push eax                    ; stack = x0*sin
 
@@ -381,12 +383,11 @@ apply_rope:
 
     mov [es:di+4], eax          ; store new_x1
 
-    add bx, 8                   ; advance to next (cos, sin) pair
     add di, 8                   ; advance to next (x0, x1) pair
     loop .pair_loop
 
     pop cx
-    pop bx
+    pop si
     loop .head_loop
     ret
 
@@ -463,8 +464,9 @@ get_kv_offset:
 ; in DI:  t (token position)
 ; out SI: &R_ATT[h][t]
 get_att_ptr:
-    imul si, bp, 2048      ; h * 2048 (SEG * 4 bytes)
-    add si, R_ATT          ; SI = base of this head's attention scores
+    inc bp
+    imul si, bp, 2048      ; (h + 1) * 2048, with R_ATT at 0x0800
+    dec bp
     imul cx, di, 4         ; cx = t * 4 (4 bytes per score)
     add si, cx             ; SI = &R_ATT[h][t]
     ret
@@ -495,6 +497,11 @@ inc_bx_q_lp_tail:
 
 quant_cache_q_lp_tail:
     loop quant_cache.q_lp
+    ret
+
+silu_gate_tail:
+    xchg di, bx
+    pop di
     ret
 
 set_ds_token_emb:
@@ -866,9 +873,7 @@ silu_gate:
     call q16_shift              ; shift back to FP16.16
     stosd                       ; gate[i] = res, DI += 4
     loop .lp
-    xchg di, bx
-    pop di
-    ret
+    jmp silu_gate_tail
 
 _code_end:
 %assign code_size _code_end - $$
