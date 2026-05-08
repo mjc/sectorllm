@@ -463,13 +463,13 @@ get_kv_offset:
 ; R_ATT layout is [head][token], each element being FP16.16
 ; in BP:  h (head index)
 ; in DI:  t (token position)
-; out SI: &R_ATT[h][t]
+; out SI: &R_ATT[h][t], DX: t * 4
 get_att_ptr:
     inc bp
     imul si, bp, 2048      ; (h + 1) * 2048, with R_ATT at 0x0800
     dec bp
-    imul cx, di, 4         ; cx = t * 4 (4 bytes per score)
-    add si, cx             ; SI = &R_ATT[h][t]
+    imul dx, di, 4         ; dx = t * 4 (4 bytes per score)
+    add si, dx             ; SI = &R_ATT[h][t]
     ret
 
 ; It is slower to always call this function but it saves two bytes each time!
@@ -744,9 +744,9 @@ attention:
     pop bp                      ; restore h
 
     ; Dequantize: multiply by K scale for token t
-    call get_att_ptr            ; SI = &R_ATT[h][t], CX = t * 4
+    call get_att_ptr            ; SI = &R_ATT[h][t], DX = t * 4
     push si
-    push cx
+    push dx
     mov dx, KS_SEG
     call set_seg_128            ; DS = K scale cache for this layer
     pop si
@@ -771,11 +771,9 @@ attention:
     ; 2. Softmax over attention scores
     ; Converts raw R_ATT[h][0..pos] to probabilities
 .softmax:
-    push di
-    xor di, di
+    xchg cx, di
     call get_att_ptr            ; SI = &R_ATT[h][0]
     mov di, si
-    pop cx
 
     ; Find max score
     push di
@@ -843,8 +841,8 @@ attention:
 
     ; Dequantize V: multiply a_t by V scale for token t
     push ds
-    push cx
-    mov dh, VS_SEG >> 8
+    push dx
+    mov dx, VS_SEG
     call set_seg_128            ; DS = V scale cache for this layer
     pop si                      ; t * 4 from get_att_ptr
     imul dword [si]             ; multiply by scale_vt
