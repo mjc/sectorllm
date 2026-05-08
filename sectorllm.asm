@@ -489,16 +489,16 @@ get_pos_count:
     inc cx
     ret
 
-lm_best_tail:
-    mov bx, [es:R_BEST]
-    ret
-
 inc_bx_q_lp_tail:
     inc bx
 
 quant_cache_q_lp_tail:
     loop quant_cache.q_lp
     ret
+
+silu_gate_q16_tail:
+    call q16_shift              ; shift back to FP16.16
+    stosd                       ; gate[i] = res, DI += 4
 
 silu_gate_loop_tail:
     loop silu_gate.lp
@@ -543,9 +543,7 @@ silu_gate:
     ; Multiply by up[i] and store in gate[i]
     es lodsd                    ; eax = up[i]
     imul dword [fs:bx]          ; eax = up[i] * silu(gate[i])
-    call q16_shift              ; shift back to FP16.16
-    stosd                       ; gate[i] = res, DI += 4
-    jmp silu_gate_loop_tail
+    jmp silu_gate_q16_tail
 
 quant_cache:
     ; Find max absolute value
@@ -701,7 +699,8 @@ forward:
     test bh, VOCAB >> 8
     jz .lm_loop                 ; next token
 
-    jmp lm_best_tail
+    mov bx, [es:R_BEST]
+    ret
 
 ; Compute multi-head grouped-query attention for the current position.
 ; Reads Q from R_QKV, K/V from the quantized KV cache.
