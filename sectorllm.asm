@@ -701,7 +701,7 @@ forward:
     test bh, VOCAB >> 8
     jz .lm_loop                 ; next token
 
-    mov bx, [es:R_BEST]
+    mov bx, [es:di + R_BEST - R_MAX]
     ret
 
 ; Compute multi-head grouped-query attention for the current position.
