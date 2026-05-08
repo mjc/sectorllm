@@ -489,6 +489,9 @@ get_pos_count:
     inc cx
     ret
 
+quant_cache_store_tail:
+    mov [bx], al                ; store quantized byte
+
 inc_bx_q_lp_tail:
     inc bx
 
@@ -580,8 +583,7 @@ quant_cache:
     es lodsd
     cdq
     idiv ebp                    ; eax = round(x/scale), clamped to int8
-    mov [bx], al                ; store quantized byte
-    jmp inc_bx_q_lp_tail
+    jmp quant_cache_store_tail
 
 ; Full forward pass of the transformer for one token.
 ; in BX:  input token index
