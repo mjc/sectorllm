@@ -857,7 +857,7 @@ attention:
     mov ah, R_XB >> 8
     xchg ax, si                 ; SI = &R_XB[h]
 
-    mov cx, HEAD_DIM
+    mov cl, HEAD_DIM
 .v_mac:
     movsx eax, byte [bx]        ; eax = V[t][i] (int8)
     inc bx
