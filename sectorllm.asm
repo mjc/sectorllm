@@ -158,7 +158,6 @@ start_inference:
 
 .gen_loop:
     call forward
-    cmp bx, 2                   ; check for BOS or EOS
     jbe $
     call print_token
     inc word [es:CUR_POS]
@@ -202,8 +201,7 @@ inv_sqrt:
 zero_di_do_rmsnorm:
         xor di, di
 do_rmsnorm:
-        imul cx, word [es:CUR_LAYER], 16
-        add ax, cx
+        add ax, [es:CUR_LAYER]
         mov ds, ax
         xor bx, bx
 
@@ -256,7 +254,7 @@ rmsnorm:
 ; ES:DI: input vector
 ; ES:BX: output vector
 do_matmul:
-    imul si, cx, LAYERS        ; SI = scale segment delta = stride * layers
+    imul si, cx, LAYERS * 16   ; SI = scale segment delta = stride * layers
     add si, ax                 ; SI = scale segment base
     imul cx, [es:CUR_LAYER]    ; cx = layer * stride (paragraphs)
     add ax, cx                 ; ax = weight base + layer*stride
@@ -419,10 +417,10 @@ print_token:
 ; in DX:  base segment
 ; out DS: base + (CUR_LAYER * stride)
 set_seg_1024:
-    mov cl, 10
+    mov cl, 6
     db 0x3D                     ; Nice!
 set_seg_128:
-    mov cl, 7
+    mov cl, 3
 .do_seg:
     push ax
     mov ax, [es:CUR_LAYER]
@@ -488,6 +486,10 @@ get_pos_count:
     mov cx, [es:CUR_POS]
     inc cx
     ret
+
+quant_cache_div_tail:
+    cdq                         ; sign-extend into edx
+    idiv ebp                    ; eax = round(x/scale), clamped to int8
 
 quant_cache_store_tail:
     mov [bx], al                ; store quantized byte
@@ -581,9 +583,7 @@ quant_cache:
     mov cl, KV_DIM
 .q_lp:
     es lodsd
-    cdq
-    idiv ebp                    ; eax = round(x/scale), clamped to int8
-    jmp quant_cache_store_tail
+    jmp quant_cache_div_tail
 
 ; Full forward pass of the transformer for one token.
 ; in BX:  input token index
@@ -605,7 +605,7 @@ forward:
 
     ; Project normalized input to Q, K, V simultaneously
     mov ax, W_WQKV_Q
-    mov ch, 2
+    mov cl, 0x20
     mov edx, (DIM << 16) | (DIM + 2*KV_DIM) ; rows=96 (Q+K+V), cols=64
     call do_matmul              ; R_QKV = [Q | K | V] = w_wqkv * R_XB
 
@@ -625,7 +625,7 @@ forward:
 
     ; Project attention output back to DIM
     mov ax, W_WO_Q
-    mov ch, 1
+    mov cl, 0x10
     mov edx, (DIM << 16) | DIM
     mov di, R_XB
     mov bh, R_XB2 >> 8
@@ -642,7 +642,7 @@ forward:
 
     ; Project up to hidden dim
     mov ax, W_W13_Q
-    mov cx, 0x560
+    mov cl, 0x56
     mov edx, (DIM << 16) | (2*HIDDEN)
     call do_matmul              ; R_HB = [gate | up] = w_w13 * R_XB
 
@@ -651,7 +651,7 @@ forward:
 
     ; Project back down to DIM
     mov ax, W_W2_Q
-    mov ch, P_W2_Q_L >> 8
+    mov cl, P_W2_Q_L >> 4
     mov edx, (HIDDEN << 16) | DIM
     call do_matmul              ; R_XB = w_w2 * R_HB
 
@@ -659,8 +659,8 @@ forward:
     call vadd_rx                ; R_X + R_XB
 
     ; Go to next layer
-    inc word [es:CUR_LAYER]
-    cmp word [es:CUR_LAYER], LAYERS
+    add byte [es:CUR_LAYER], 16
+    cmp byte [es:CUR_LAYER], LAYERS * 16
     jl .layer
 
     ; Final normalization
@@ -702,6 +702,7 @@ forward:
     jz .lm_loop                 ; next token
 
     mov bx, [es:di + R_BEST - R_MAX]
+    cmp bx, 2                   ; check for BOS or EOS
     ret
 
 ; Compute multi-head grouped-query attention for the current position.
