@@ -822,8 +822,9 @@ attention:
     ; out[h] = sum over t of (attention[h][t] * V[t])
 .agg:
     ; Clear r_xb[h] before accumulating
-    imul di, bp, 32             ; h * 32
-    add di, R_XB
+    imul ax, bp, 32             ; h * 32
+    mov ah, R_XB >> 8
+    xchg ax, di
     xor ax, ax
     mov cl, HEAD_DIM * 2
     rep stosw                   ; zero out R_XB[h]
@@ -853,8 +854,9 @@ attention:
 
     ; Accumulate: R_XB[h] += a_scale * V[t]
     xchg edx, eax               ; edx = a_scaled
-    imul si, bp, 32             ; h * 32
-    add si, R_XB                ; SI = &R_XB[h]
+    imul ax, bp, 32             ; h * 32
+    mov ah, R_XB >> 8
+    xchg ax, si                 ; SI = &R_XB[h]
 
     mov cx, HEAD_DIM
 .v_mac:
