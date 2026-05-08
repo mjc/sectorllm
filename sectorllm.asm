@@ -774,7 +774,7 @@ attention:
 .softmax:
     xchg cx, di
     call get_att_ptr            ; SI = &R_ATT[h][0]
-    mov di, si
+    xchg di, si
 
     ; Find max score
     push di
@@ -790,7 +790,6 @@ attention:
     ; Compute exp(x - max) for each score and accumulate sum
     push di
     push cx
-    xor si, si                  ; sum = 0
 .s_exp:
     push eax                    ; save max
     sub eax, [es:di]            ; diff = max - x
