@@ -722,8 +722,9 @@ attention:
     call call_set_seg_1024_jmp_get_kv_offset ; DS = K cache, BX = offset of K[t][kvh]
 
     ; Load Q vector for head h
-    imul si, bp, 32             ; h * 32
-    add si, R_QKV               ; SI = &Q[h]
+    imul ax, bp, 32             ; h * 32
+    mov ah, R_QKV >> 8
+    xchg ax, si                 ; SI = &Q[h]
 
     push bp                     ; save h
     mov cl, HEAD_DIM
