@@ -249,11 +249,14 @@ rmsnorm:
 
 ; matmul helper:
 ; in AX:   base_Q
-; in CX:   layer stride
-; in EDX:  (rows<<16) | cols
+; in CL:   layer stride
+; in CH:   cols
+; in DX:   rows
 ; ES:DI: input vector
 ; ES:BX: output vector
 do_matmul:
+    push cx                    ; save cols while deriving layer segments
+    xor ch, ch
     imul si, cx, LAYERS * 16   ; SI = scale segment delta = stride * layers
     add si, ax                 ; SI = scale segment base
     imul cx, [es:CUR_LAYER]    ; cx = layer * stride (paragraphs)
@@ -265,26 +268,27 @@ do_matmul:
     mov ebp, [si]              ; load scale for current layer
 
     mov ds, ax                 ; DS = this layer's int8 weight segment
+    pop cx
+    xchg ax, dx                 ; ax = rows
+    shr cx, 8                  ; cx = cols
 
 ; Multiply an int8 matrix by a FP16.16 vector
 ; in DS:SI:     int8 weight matrix (row-major)
 ; in ES:DI:     input vector (FP16.16[COLS])
 ; in ES:BX:     output vector (FP16.16[ROWS])
-; in EDX:       (ROWS << 16) | COLS
+; in AX:         rows
+; in CX:         cols
 ; in EBP:       FP16.16 scale factor for dequantization
 matmul:
-    xchg ax, dx                 ; ax = ROWS
-    shr edx, 16                 ; dx = COLS
 
 ; For each output element
 .row:
     push ax                     ; save row count
-    push dx                     ; save cols
+    push cx                     ; save cols
     push di                     ; save input vector base
     push bx                     ; save out
 
     xor ebx, ebx                ; ebx = dot product accumulator
-    mov cx, dx                  ; cx = cols (loop counter)
 
 ; dot product: sum(weight[col] * input[col])
 .dot:
@@ -307,7 +311,7 @@ matmul:
     stosd                       ; store result and advance output pointer
     mov bx, di                  ; keep advanced output pointer for caller/next row
     pop di
-    pop dx
+    pop cx
     pop ax
     dec ax
     jnz .row
@@ -605,8 +609,8 @@ forward:
 
     ; Project normalized input to Q, K, V simultaneously
     mov ax, W_WQKV_Q
-    mov cl, 0x20
-    mov edx, (DIM << 16) | (DIM + 2*KV_DIM) ; rows=96 (Q+K+V), cols=64
+    mov cx, (DIM << 8) | 0x20
+    mov dx, DIM + 2*KV_DIM      ; rows = Q+K+V
     call do_matmul              ; R_QKV = [Q | K | V] = w_wqkv * R_XB
 
 
@@ -625,8 +629,8 @@ forward:
 
     ; Project attention output back to DIM
     mov ax, W_WO_Q
-    mov cl, 0x10
-    mov edx, (DIM << 16) | DIM
+    mov cx, (DIM << 8) | 0x10
+    mov dx, DIM
     mov di, R_XB
     mov bh, R_XB2 >> 8
     call do_matmul              ; R_XB2 = w_wo * R_XB
@@ -642,8 +646,8 @@ forward:
 
     ; Project up to hidden dim
     mov ax, W_W13_Q
-    mov cl, 0x56
-    mov edx, (DIM << 16) | (2*HIDDEN)
+    mov cx, (DIM << 8) | 0x56
+    mov dx, 2*HIDDEN
     call do_matmul              ; R_HB = [gate | up] = w_w13 * R_XB
 
     ; Apply SiLU gating
@@ -651,8 +655,8 @@ forward:
 
     ; Project back down to DIM
     mov ax, W_W2_Q
-    mov cl, P_W2_Q_L >> 4
-    mov edx, (HIDDEN << 16) | DIM
+    mov cx, (HIDDEN << 8) | (P_W2_Q_L >> 4)
+    mov dx, DIM
     call do_matmul              ; R_XB = w_w2 * R_HB
 
     ; Residual connection

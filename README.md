@@ -1,7 +1,7 @@
 # sectorllm
 >  The world's smallest llama2 inference engine
 
-A complete Llama2 inference engine that fits in 1356 bytes of x86 real mode assembly.
+A complete Llama2 inference engine that fits in 1023 bytes of x86 real mode assembly.
 It boots directly from disk, loads a quantized model, and generates text before any operating system loads.
 
 ![image](image.png)
